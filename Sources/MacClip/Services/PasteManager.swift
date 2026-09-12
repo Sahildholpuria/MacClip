@@ -56,7 +56,7 @@ public final class PasteManager: ObservableObject {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
-        // 1. Populate pasteboard with comprehensive formats
+        // 1. Write multi-flavor data to pasteboard
         if item.itemType == .image, let path = item.imagePath,
            let imgData = try? Data(contentsOf: URL(fileURLWithPath: path)),
            let image = NSImage(data: imgData) {
@@ -64,8 +64,6 @@ public final class PasteManager: ObservableObject {
             ClipboardMonitor.shared.lastSelfPastedImageBytes = imgData.count
 
             let fileURL = URL(fileURLWithPath: path)
-            
-            // Declare all standard image types
             pasteboard.declareTypes([
                 .tiff,
                 NSPasteboard.PasteboardType("public.png"),
@@ -77,57 +75,68 @@ public final class PasteManager: ObservableObject {
             }
             pasteboard.setData(imgData, forType: NSPasteboard.PasteboardType("public.png"))
             pasteboard.setString(fileURL.absoluteString, forType: NSPasteboard.PasteboardType("public.file-url"))
-            
-            // Write both NSImage and NSURL objects for maximum compatibility across Slack, Discord, Pages, Notes, etc.
             pasteboard.writeObjects([image, fileURL as NSURL])
         } else {
             ClipboardMonitor.shared.lastSelfPastedText = item.text
             pasteboard.setString(item.text, forType: .string)
         }
 
-        // 2. Hide MacClip panel and process so macOS automatically yields focus back to the target app
-        DispatchQueue.main.async {
-            AppDelegate.shared?.hidePanel()
-            NSApp.hide(nil)
+        // 2. Hide MacClip panel and hide MacClip app to yield focus back to target app
+        AppDelegate.shared?.hidePanel()
+        NSApp.hide(nil)
 
-            // Explicitly reactivate the target application
-            if let targetApp = targetApp, targetApp.bundleIdentifier != Bundle.main.bundleIdentifier {
-                targetApp.activate(options: [.activateIgnoringOtherApps])
-            }
+        // 3. Explicitly reactivate the target application
+        let appToActivate = targetApp ?? NSWorkspace.shared.runningApplications.first {
+            $0.activationPolicy == .regular && $0.bundleIdentifier != Bundle.main.bundleIdentifier
+        }
 
-            // 3. Simulate Cmd+V keystroke after focus transition settles
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                self.simulatePasteKeystroke()
-            }
+        if let app = appToActivate {
+            app.activate(options: [.activateIgnoringOtherApps])
+        }
+
+        // 4. Delay 200ms for window focus transition, then simulate Cmd+V
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) { [weak self] in
+            self?.simulatePasteKeystroke(targetApp: appToActivate)
         }
     }
 
-    private func simulatePasteKeystroke() {
-        guard AXIsProcessTrusted() else {
-            print("MacClip: Accessibility permission not granted yet. Item copied to clipboard for manual ⌘V paste.")
-            return
-        }
+    private func simulatePasteKeystroke(targetApp: NSRunningApplication? = nil) {
+        let trusted = AXIsProcessTrusted()
 
-        // Use hidSystemState so physical modifier keys (like Option) don't contaminate the synthetic event
+        // 1. Simulate Cmd+V keystroke via CGEvent
         let source = CGEventSource(stateID: .hidSystemState)
         let vKeyCode = CGKeyCode(kVK_ANSI_V) // 9
 
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) else {
-            return
+        if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true),
+           let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) {
+            
+            keyDown.flags = .maskCommand
+            keyUp.flags = .maskCommand
+
+            // Post directly to target PID if available
+            if let pid = targetApp?.processIdentifier {
+                keyDown.postToPid(pid)
+            }
+
+            // Post to session and HID taps
+            keyDown.post(tap: .cgAnnotatedSessionEventTap)
+            keyDown.post(tap: .cghidEventTap)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+                if let pid = targetApp?.processIdentifier {
+                    keyUp.postToPid(pid)
+                }
+                keyUp.post(tap: .cgAnnotatedSessionEventTap)
+                keyUp.post(tap: .cghidEventTap)
+            }
         }
 
-        // Both down and up events must have Command modifier flag
-        keyDown.flags = .maskCommand
-        keyUp.flags = .maskCommand
-
-        keyDown.post(tap: .cghidEventTap)
-        keyDown.post(tap: .cgAnnotatedSessionEventTap)
-
-        // Ensure a 25ms gap between key-down and key-up for responsive event-loop consumption
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) {
-            keyUp.post(tap: .cghidEventTap)
-            keyUp.post(tap: .cgAnnotatedSessionEventTap)
+        // 2. If accessibility is not granted, notify user so they know item is on clipboard
+        if !trusted {
+            let notification = NSUserNotification()
+            notification.title = "MacClip"
+            notification.informativeText = "Copied to clipboard! Press ⌘V to paste."
+            NSUserNotificationCenter.default.deliver(notification)
         }
     }
 }

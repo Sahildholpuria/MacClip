@@ -6,7 +6,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var panel: FloatingPanel?
     private var menuBarController: MenuBarController?
-    private var previousApp: NSRunningApplication?
+    public private(set) var previousApp: NSRunningApplication?
 
     public override init() {
         super.init()
@@ -58,8 +58,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Save active application to restore focus later for auto-pasting
         let frontmost = NSWorkspace.shared.frontmostApplication
-        if frontmost?.bundleIdentifier != Bundle.main.bundleIdentifier {
+        if let frontmost = frontmost, frontmost.bundleIdentifier != Bundle.main.bundleIdentifier {
             self.previousApp = frontmost
+        } else if self.previousApp == nil || self.previousApp?.isTerminated == true {
+            self.previousApp = NSWorkspace.shared.runningApplications.first {
+                $0.activationPolicy == .regular && $0.bundleIdentifier != Bundle.main.bundleIdentifier
+            }
         }
 
         // Reset search query, selection, and settings on show
@@ -67,7 +71,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardHistoryStore.shared.selectedIndex = 0
         ClipboardHistoryStore.shared.isSettingsOpen = false
 
-        // Always attach fresh NSHostingView so all items render with up-to-date state
+        // Attach fresh NSHostingView so all items render with up-to-date state
         let contentView = ClipboardHistoryView(
             onSelect: { [weak self] item in
                 self?.paste(item: item)
@@ -88,8 +92,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func paste(item: ClipboardItem) {
-        hidePanel()
-        PasteManager.shared.paste(item: item, targetApp: previousApp)
+        let target = self.previousApp
+        PasteManager.shared.paste(item: item, targetApp: target)
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

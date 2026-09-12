@@ -62,8 +62,8 @@ cat << 'PLIST' > "$CONTENTS_DIR/Info.plist"
 </plist>
 PLIST
 
-echo "🔏 Code-signing $APP_NAME for macOS TCC Accessibility..."
-codesign --force --deep --sign - "$APP_DIR"
+echo "🔏 Code-signing $APP_NAME with stable designated requirements..."
+codesign --force --deep --sign - --requirements '=designated => identifier "com.sahildholpuria.MacClip"' "$APP_DIR"
 
 echo "✅ Successfully built and signed $APP_NAME at: $APP_DIR"
 echo ""
