@@ -4,7 +4,7 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
-VERSION="1.0.4"
+VERSION="1.0.5"
 DMG_NAME="MacClip-${VERSION}.dmg"
 DIST_DIR="$DIR/dist"
 STAGING_DIR="/tmp/macclip_dmg_staging"

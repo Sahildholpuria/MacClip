@@ -71,6 +71,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardHistoryStore.shared.hoveredIndex = nil
         ClipboardHistoryStore.shared.previewItem = nil
         ClipboardHistoryStore.shared.isSettingsOpen = showSettings
+        ClipboardHistoryStore.shared.updateStorageStats()
 
         // Attach fresh NSHostingView so all items render with up-to-date state
         let contentView = ClipboardHistoryView(

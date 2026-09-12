@@ -8,6 +8,7 @@ Built with **Swift**, **SwiftUI**, and **AppKit** for Apple Silicon and macOS 13
 
 ## ✨ Features
 
+- **History Retention & Auto-Cleanup 🧹**: Keep storage and memory ultra-lean with configurable history size limits (`50`, `100`, `250`, `500`, `Unlimited`) and age-based auto-cleanup timers (`Never`, `24h`, `7 Days`, `30 Days`). Features live disk usage metrics, periodic background pruning, and a 1-click **"Clean Up Now"** optimization tool (*pinned clips are permanently protected*).
 - **Quick Look Interactive Preview (`Space` or `⌘Y`) 🔍**: Instant interactive preview modal for any selected clip! Zoom full-resolution images with dimension badges, inspect hex colors with real-time format conversions (HEX, RGB, HSL), view and clean URLs by stripping tracking parameters (`utm_*`, `fbclid`), view text statistics (characters, words, lines), prettify raw JSON, and apply quick case transforms (UPPERCASE, lowercase, Title Case).
 - **Paste as Plain Text (`⇧↵`) 📝**: Hold `Shift` while pressing `Enter` (or click `⇧↵ Plain`) to strip all rich formatting, fonts, inline styles, and web artifacts, pasting pure clean unformatted text directly into your target app.
 - **Password Manager Auto-Ignore 🛡️**: Automatically respects your privacy by ignoring clips copied from sensitive password managers (1Password, Bitwarden, Apple Passwords, Keychain, KeePassXC, LastPass) or clips tagged with concealed/transient clipboard markers. Easily toggle on or off in Settings.

@@ -46,7 +46,64 @@ public final class ClipboardHistoryStore: ObservableObject {
         }
     }
 
-    private let maxHistoryCount = 150
+    public enum HistoryLimit: Int, CaseIterable, Identifiable {
+        case fifty = 50
+        case oneHundred = 100
+        case twoHundredFifty = 250
+        case fiveHundred = 500
+        case unlimited = 10000
+
+        public var id: Int { rawValue }
+
+        public var label: String {
+            switch self {
+            case .fifty: return "50"
+            case .oneHundred: return "100"
+            case .twoHundredFifty: return "250"
+            case .fiveHundred: return "500"
+            case .unlimited: return "Unlimited"
+            }
+        }
+    }
+
+    public enum RetentionPeriod: Int, CaseIterable, Identifiable {
+        case never = 0
+        case oneDay = 1
+        case sevenDays = 7
+        case thirtyDays = 30
+
+        public var id: Int { rawValue }
+
+        public var label: String {
+            switch self {
+            case .never: return "Never"
+            case .oneDay: return "24h"
+            case .sevenDays: return "7 Days"
+            case .thirtyDays: return "30 Days"
+            }
+        }
+    }
+
+    @Published public var maxHistoryLimit: HistoryLimit = .oneHundred {
+        didSet {
+            UserDefaults.standard.set(maxHistoryLimit.rawValue, forKey: "MacClip_MaxHistoryLimit")
+            pruneExcessItems()
+            saveHistory()
+            updateStorageStats()
+        }
+    }
+
+    @Published public var retentionPeriod: RetentionPeriod = .never {
+        didSet {
+            UserDefaults.standard.set(retentionPeriod.rawValue, forKey: "MacClip_RetentionPeriodDays")
+            _ = performAutoCleanup()
+        }
+    }
+
+    @Published public var storageInfoText: String = "Calculating..."
+    @Published public var lastCleanupMessage: String? = nil
+
+    private var cleanupTimer: Timer?
     private let storageURL: URL
     public let imagesDirectoryURL: URL
 
@@ -68,7 +125,31 @@ public final class ClipboardHistoryStore: ObservableObject {
             self.ignorePasswordManagers = true
         }
 
+        if let storedLimitVal = UserDefaults.standard.object(forKey: "MacClip_MaxHistoryLimit") as? Int,
+           let limit = HistoryLimit(rawValue: storedLimitVal) {
+            self.maxHistoryLimit = limit
+        } else {
+            self.maxHistoryLimit = .oneHundred
+        }
+
+        if let storedRetVal = UserDefaults.standard.object(forKey: "MacClip_RetentionPeriodDays") as? Int,
+           let ret = RetentionPeriod(rawValue: storedRetVal) {
+            self.retentionPeriod = ret
+        } else {
+            self.retentionPeriod = .never
+        }
+
         loadHistory()
+        _ = performAutoCleanup()
+        updateStorageStats()
+
+        // Periodic auto-cleanup every 1 hour
+        cleanupTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
+            self?.performAutoCleanup()
+        }
+        if let timer = cleanupTimer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
     }
 
     public func togglePreview(for item: ClipboardItem?) {
@@ -211,15 +292,126 @@ public final class ClipboardHistoryStore: ObservableObject {
         }
     }
 
-    private func pruneExcessItems() {
-        if items.count > maxHistoryCount {
+    public func pruneExcessItems() {
+        let maxLimit = maxHistoryLimit.rawValue
+        if items.count > maxLimit {
             var removeIdx = items.count - 1
-            while removeIdx >= 0 && items.count > maxHistoryCount {
+            while removeIdx >= 0 && items.count > maxLimit {
                 if !items[removeIdx].isPinned {
                     let item = items.remove(at: removeIdx)
                     deleteImageFile(for: item)
                 }
                 removeIdx -= 1
+            }
+        }
+    }
+
+    @discardableResult
+    public func performAutoCleanup() -> (prunedCount: Int, freedBytes: Int64) {
+        var pruned = 0
+        var freed: Int64 = 0
+
+        // 1. Age-based cleanup for unpinned items
+        if retentionPeriod != .never {
+            let now = Date()
+            let cutoffDays = retentionPeriod.rawValue
+            if let cutoffDate = Calendar.current.date(byAdding: .day, value: -cutoffDays, to: now) {
+                var idx = items.count - 1
+                while idx >= 0 {
+                    let item = items[idx]
+                    if !item.isPinned && item.timestamp < cutoffDate {
+                        if item.itemType == .image, let path = item.imagePath {
+                            if let attr = try? FileManager.default.attributesOfItem(atPath: path),
+                               let size = attr[.size] as? Int64 {
+                                freed += size
+                            }
+                        }
+                        let removed = items.remove(at: idx)
+                        deleteImageFile(for: removed)
+                        pruned += 1
+                    }
+                    idx -= 1
+                }
+            }
+        }
+
+        // 2. Count-based pruning
+        let limit = maxHistoryLimit.rawValue
+        if items.count > limit {
+            var idx = items.count - 1
+            while idx >= 0 && items.count > limit {
+                let item = items[idx]
+                if !item.isPinned {
+                    if item.itemType == .image, let path = item.imagePath {
+                        if let attr = try? FileManager.default.attributesOfItem(atPath: path),
+                           let size = attr[.size] as? Int64 {
+                            freed += size
+                        }
+                    }
+                    let removed = items.remove(at: idx)
+                    deleteImageFile(for: removed)
+                    pruned += 1
+                }
+                idx -= 1
+            }
+        }
+
+        if pruned > 0 {
+            self.objectWillChange.send()
+            if selectedIndex >= filteredItems.count {
+                selectedIndex = max(0, filteredItems.count - 1)
+            }
+            saveHistory()
+        }
+
+        updateStorageStats()
+
+        let freedFormatted = ByteCountFormatter.string(fromByteCount: freed, countStyle: .file)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if pruned > 0 {
+                self.lastCleanupMessage = "Pruned \(pruned) item\(pruned == 1 ? "" : "s") (freed \(freedFormatted))"
+            } else {
+                self.lastCleanupMessage = "History is clean. Nothing to prune."
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
+                if self?.lastCleanupMessage != nil {
+                    self?.lastCleanupMessage = nil
+                }
+            }
+        }
+
+        return (pruned, freed)
+    }
+
+    public func updateStorageStats() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            var totalBytes: Int64 = 0
+
+            if let histAttr = try? FileManager.default.attributesOfItem(atPath: self.storageURL.path),
+               let size = histAttr[.size] as? Int64 {
+                totalBytes += size
+            }
+
+            if let files = try? FileManager.default.contentsOfDirectory(atPath: self.imagesDirectoryURL.path) {
+                for file in files {
+                    let path = self.imagesDirectoryURL.appendingPathComponent(file).path
+                    if let attr = try? FileManager.default.attributesOfItem(atPath: path),
+                       let size = attr[.size] as? Int64 {
+                        totalBytes += size
+                    }
+                }
+            }
+
+            let sizeFormatted = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
+            let itemCount = self.items.count
+            let pinnedCount = self.items.filter { $0.isPinned }.count
+
+            let text = "\(itemCount) item\(itemCount == 1 ? "" : "s") (\(pinnedCount) pinned) • \(sizeFormatted)"
+            DispatchQueue.main.async {
+                self.storageInfoText = text
             }
         }
     }
@@ -235,6 +427,7 @@ public final class ClipboardHistoryStore: ObservableObject {
                 self.selectedIndex = max(0, self.filteredItems.count - 1)
             }
             self.saveHistory()
+            self.updateStorageStats()
         }
     }
 
@@ -244,6 +437,7 @@ public final class ClipboardHistoryStore: ObservableObject {
             if let idx = self.items.firstIndex(where: { $0.id == id }) {
                 self.items[idx].isPinned.toggle()
                 self.saveHistory()
+                self.updateStorageStats()
             }
         }
     }
@@ -258,6 +452,7 @@ public final class ClipboardHistoryStore: ObservableObject {
             self.items.removeAll { !$0.isPinned }
             self.selectedIndex = 0
             self.saveHistory()
+            self.updateStorageStats()
         }
     }
 
@@ -270,6 +465,7 @@ public final class ClipboardHistoryStore: ObservableObject {
             self.items.removeAll()
             self.selectedIndex = 0
             self.saveHistory()
+            self.updateStorageStats()
         }
     }
 

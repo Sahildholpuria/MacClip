@@ -703,6 +703,174 @@ public struct ClipboardHistoryView: View {
                         .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
                 )
 
+                // History Retention & Storage Card
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack {
+                        HStack(spacing: 5) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 11.5))
+                                .foregroundColor(.orange)
+                            Text("History Retention & Storage")
+                                .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        }
+                        Spacer()
+                        Text(store.storageInfoText)
+                            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+
+                    // Max History Limit Selector
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("MAX HISTORY SIZE")
+                            .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                            .foregroundColor(.secondary.opacity(0.8))
+
+                        HStack(spacing: 4) {
+                            ForEach(ClipboardHistoryStore.HistoryLimit.allCases) { limit in
+                                let isSelected = store.maxHistoryLimit == limit
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        store.maxHistoryLimit = limit
+                                    }
+                                }) {
+                                    Text(limit.label)
+                                        .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                                        .foregroundColor(isSelected ? .white : .secondary)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 4)
+                                        .frame(maxWidth: .infinity)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                                .fill(isSelected ? Color.accentColor : Color.white.opacity(0.04))
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                                .stroke(isSelected ? Color.white.opacity(0.3) : Color.white.opacity(0.07), lineWidth: 0.6)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Auto-Cleanup Period Selector
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("AUTO-DELETE UNPINNED CLIPS")
+                            .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                            .foregroundColor(.secondary.opacity(0.8))
+
+                        HStack(spacing: 4) {
+                            ForEach(ClipboardHistoryStore.RetentionPeriod.allCases) { period in
+                                let isSelected = store.retentionPeriod == period
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        store.retentionPeriod = period
+                                    }
+                                }) {
+                                    Text(period.label)
+                                        .font(.system(size: 9.5, weight: isSelected ? .bold : .medium, design: .rounded))
+                                        .foregroundColor(isSelected ? .white : .secondary)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 4)
+                                        .frame(maxWidth: .infinity)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                                .fill(isSelected ? Color.orange.opacity(0.85) : Color.white.opacity(0.04))
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                                .stroke(isSelected ? Color.white.opacity(0.3) : Color.white.opacity(0.07), lineWidth: 0.6)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Cleanup message banner if present
+                    if let msg = store.lastCleanupMessage {
+                        HStack(spacing: 5) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.green)
+                            Text(msg)
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundColor(.primary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.green.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .transition(.opacity)
+                    }
+
+                    // Action buttons: Clean Up Now, Clear Unpinned, Clear All
+                    HStack(spacing: 6) {
+                        Button(action: {
+                            withAnimation {
+                                _ = store.performAutoCleanup()
+                            }
+                        }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 9.5))
+                                Text("Clean Up Now")
+                                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundColor(.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.12), lineWidth: 0.6))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Prune expired clips and excess unpinned items immediately")
+
+                        Spacer()
+
+                        Button(action: {
+                            store.clearUnpinned()
+                        }) {
+                            Text("Clear Unpinned")
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.white.opacity(0.05))
+                                .foregroundColor(.secondary)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.08), lineWidth: 0.6))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            store.clearAll()
+                        }) {
+                            Text("Clear All")
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red.opacity(0.12))
+                                .foregroundColor(.red)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.red.opacity(0.25), lineWidth: 0.6))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.top, 2)
+                }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                )
+
                 // Done Button
                 HStack {
                     Spacer()

@@ -88,6 +88,18 @@ public final class MenuBarController {
         }
         menu.addItem(accessItem)
 
+        menu.addItem(NSMenuItem.separator())
+
+        // Storage & Retention
+        let store = ClipboardHistoryStore.shared
+        let storageItem = NSMenuItem(title: "Storage: \(store.storageInfoText)", action: nil, keyEquivalent: "")
+        storageItem.isEnabled = false
+        menu.addItem(storageItem)
+
+        let cleanupItem = NSMenuItem(title: "Run Auto-Cleanup Now", action: #selector(runCleanup), keyEquivalent: "")
+        cleanupItem.target = self
+        menu.addItem(cleanupItem)
+
         let clearItem = NSMenuItem(title: "Clear Unpinned History", action: #selector(clearHistory), keyEquivalent: "")
         clearItem.target = self
         menu.addItem(clearItem)
@@ -123,6 +135,10 @@ public final class MenuBarController {
 
     @objc private func clearHistory() {
         ClipboardHistoryStore.shared.clearUnpinned()
+    }
+
+    @objc private func runCleanup() {
+        ClipboardHistoryStore.shared.performAutoCleanup()
     }
 
     @objc private func quitApp() {
