@@ -17,13 +17,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Start clipboard change observer
         ClipboardMonitor.shared.startMonitoring()
 
+        // Check accessibility status
+        PasteManager.shared.checkAccessibility()
+
         // Setup Menu Bar icon
         menuBarController = MenuBarController()
 
         // Setup Floating Window
         setupPanel()
 
-        // Register Option + V hotkey
+        // Register custom or default hotkey
         GlobalHotKeyManager.shared.onHotKeyPressed = { [weak self] in
             self?.togglePanel()
         }
@@ -33,7 +36,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupPanel() {
-        let panelRect = NSRect(x: 0, y: 0, width: 400, height: 500)
+        let panelRect = NSRect(x: 0, y: 0, width: 430, height: 530)
         let floatingPanel = FloatingPanel(contentRect: panelRect)
 
         let contentView = ClipboardHistoryView(
@@ -61,6 +64,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func showPanel() {
         guard let panel = panel else { return }
 
+        // Recheck accessibility permission on show
+        PasteManager.shared.checkAccessibility()
+
         // Save active application to restore focus later for auto-pasting
         let frontmost = NSWorkspace.shared.frontmostApplication
         if frontmost?.bundleIdentifier != Bundle.main.bundleIdentifier {
@@ -70,6 +76,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Reset search query and selection on show
         ClipboardHistoryStore.shared.searchText = ""
         ClipboardHistoryStore.shared.selectedIndex = 0
+        ClipboardHistoryStore.shared.isSettingsOpen = false
 
         panel.positionNearMouseOrCenter()
         panel.makeKeyAndOrderFront(nil)

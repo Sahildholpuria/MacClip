@@ -4,6 +4,8 @@ import AppKit
 public struct ClipboardHistoryView: View {
     @ObservedObject var store = ClipboardHistoryStore.shared
     @ObservedObject var hotkeyManager = GlobalHotKeyManager.shared
+    @ObservedObject var pasteManager = PasteManager.shared
+
     public var onSelect: ((ClipboardItem) -> Void)?
     public var onClose: (() -> Void)?
 
@@ -20,7 +22,8 @@ public struct ClipboardHistoryView: View {
                 .padding(.top, 14)
                 .padding(.bottom, 10)
 
-            if !PasteManager.shared.isAccessibilityGranted {
+            // Accessibility Banner (dismissible)
+            if !pasteManager.isAccessibilityGranted && !pasteManager.isBannerDismissed && !store.isSettingsOpen {
                 accessibilityBanner
                     .padding(.horizontal, 14)
                     .padding(.bottom, 8)
@@ -29,7 +32,7 @@ public struct ClipboardHistoryView: View {
             Divider()
                 .opacity(0.3)
 
-            // Main Body: Settings View or Clips List
+            // Main Content: Settings View or Clips List
             if store.isSettingsOpen {
                 settingsView
             } else if store.filteredItems.isEmpty {
@@ -101,7 +104,7 @@ public struct ClipboardHistoryView: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .help("Shortcut Settings")
+                .help("Settings & Shortcuts")
 
                 Button(action: { onClose?() }) {
                     Image(systemName: "xmark")
@@ -119,6 +122,48 @@ public struct ClipboardHistoryView: View {
         .padding(.horizontal, 10)
         .background(store.isSettingsOpen ? Color.clear : Color.primary.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    // MARK: - Accessibility Banner
+    private var accessibilityBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "hand.raised.fill")
+                .foregroundColor(.orange)
+                .font(.system(size: 11))
+
+            Text("Auto-paste needs Accessibility")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Button("Grant") {
+                pasteManager.requestAccessibility()
+            }
+            .font(.system(size: 10, weight: .medium))
+            .buttonStyle(.borderedProminent)
+            .controlSize(.mini)
+
+            Button("Verify") {
+                pasteManager.checkAccessibility()
+            }
+            .font(.system(size: 10))
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+
+            Button(action: { pasteManager.dismissBanner() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .padding(3)
+            }
+            .buttonStyle(.plain)
+            .help("Dismiss notice")
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(Color.orange.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     // MARK: - Settings View
@@ -160,7 +205,7 @@ public struct ClipboardHistoryView: View {
                         }
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 7)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03))
@@ -171,6 +216,38 @@ public struct ClipboardHistoryView: View {
                     }
                 }
             }
+
+            Divider()
+                .padding(.vertical, 4)
+
+            // Accessibility Status in Settings
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Auto-Paste Permission")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(pasteManager.isAccessibilityGranted ? "Granted (Keystrokes will auto-paste)" : "Not granted (Click to open System Settings)")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+
+                if pasteManager.isAccessibilityGranted {
+                    Label("Active", systemImage: "checkmark.seal.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.green)
+                } else {
+                    Button("Open Settings") {
+                        pasteManager.requestAccessibility()
+                    }
+                    .font(.system(size: 11))
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.primary.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
 
             Spacer()
 
@@ -185,32 +262,6 @@ public struct ClipboardHistoryView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    // MARK: - Accessibility Banner
-    private var accessibilityBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "hand.raised.fill")
-                .foregroundColor(.orange)
-                .font(.system(size: 11))
-
-            Text("Auto-paste needs Accessibility permission")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-
-            Spacer()
-
-            Button("Grant") {
-                PasteManager.shared.requestAccessibility()
-            }
-            .font(.system(size: 11, weight: .medium))
-            .buttonStyle(.borderedProminent)
-            .controlSize(.mini)
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(Color.orange.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     // MARK: - List
