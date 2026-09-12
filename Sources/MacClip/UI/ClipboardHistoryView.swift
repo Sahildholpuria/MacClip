@@ -3,6 +3,7 @@ import AppKit
 
 public struct ClipboardHistoryView: View {
     @ObservedObject var store = ClipboardHistoryStore.shared
+    @ObservedObject var hotkeyManager = GlobalHotKeyManager.shared
     public var onSelect: ((ClipboardItem) -> Void)?
     public var onClose: (() -> Void)?
 
@@ -13,7 +14,7 @@ public struct ClipboardHistoryView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Header: Search & Close
+            // Header
             headerView
                 .padding(.horizontal, 14)
                 .padding(.top, 14)
@@ -28,8 +29,10 @@ public struct ClipboardHistoryView: View {
             Divider()
                 .opacity(0.3)
 
-            // Content List
-            if store.filteredItems.isEmpty {
+            // Main Body: Settings View or Clips List
+            if store.isSettingsOpen {
+                settingsView
+            } else if store.filteredItems.isEmpty {
                 emptyStateView
             } else {
                 listView
@@ -43,13 +46,145 @@ public struct ClipboardHistoryView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
         }
-        .frame(width: 420, height: 530)
+        .frame(width: 430, height: 530)
         .background(VisualEffectBackground())
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
         )
+    }
+
+    // MARK: - Header
+    private var headerView: some View {
+        HStack(spacing: 8) {
+            if store.isSettingsOpen {
+                Text("Preferences")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Button(action: { store.isSettingsOpen = false }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Clips")
+                    }
+                    .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.primary.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 14, weight: .medium))
+
+                TextField("Search clips & images...", text: $store.searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+
+                if !store.searchText.isEmpty {
+                    Button(action: { store.searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button(action: { store.isSettingsOpen.toggle() }) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(5)
+                        .background(Color.primary.opacity(0.06))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Shortcut Settings")
+
+                Button(action: { onClose?() }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.secondary)
+                        .padding(5)
+                        .background(Color.primary.opacity(0.06))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Close (Esc)")
+            }
+        }
+        .padding(.vertical, store.isSettingsOpen ? 4 : 8)
+        .padding(.horizontal, 10)
+        .background(store.isSettingsOpen ? Color.clear : Color.primary.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    // MARK: - Settings View
+    private var settingsView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Global Activation Shortcut")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.primary)
+
+            Text("Choose the key combination to summon MacClip from anywhere:")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            VStack(spacing: 6) {
+                ForEach(HotkeySetting.presets, id: \.id) { preset in
+                    let isSelected = hotkeyManager.currentSetting.id == preset.id
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(preset.name)
+                                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                        }
+                        Spacer()
+                        Text(preset.displayString)
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(isSelected ? Color.accentColor : Color.primary.opacity(0.08))
+                            .foregroundColor(isSelected ? .white : .primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.accentColor)
+                                .font(.system(size: 13))
+                        } else {
+                            Image(systemName: "circle")
+                                .foregroundColor(.secondary.opacity(0.4))
+                                .font(.system(size: 13))
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03))
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        hotkeyManager.updateHotkey(to: preset)
+                    }
+                }
+            }
+
+            Spacer()
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    store.isSettingsOpen = false
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     // MARK: - Accessibility Banner
@@ -76,43 +211,6 @@ public struct ClipboardHistoryView: View {
         .padding(.horizontal, 10)
         .background(Color.orange.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    // MARK: - Header
-    private var headerView: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
-                .font(.system(size: 14, weight: .medium))
-
-            TextField("Search clipboard (e.g. text, link, code)...", text: $store.searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-
-            if !store.searchText.isEmpty {
-                Button(action: { store.searchText = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-            }
-
-            Button(action: { onClose?() }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.secondary)
-                    .padding(5)
-                    .background(Color.primary.opacity(0.06))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .help("Close (Esc)")
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 10)
-        .background(Color.primary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: - List
@@ -160,7 +258,7 @@ public struct ClipboardHistoryView: View {
             if store.searchText.isEmpty {
                 Text("Clipboard is Empty")
                     .font(.system(size: 15, weight: .medium))
-                Text("Copy text anywhere with ⌘C to build your history.")
+                Text("Copy text or screenshots anywhere to build your history.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -197,7 +295,7 @@ public struct ClipboardHistoryView: View {
 
             Spacer()
 
-            if !store.items.isEmpty {
+            if !store.items.isEmpty && !store.isSettingsOpen {
                 Button("Clear") {
                     store.clearUnpinned()
                 }
@@ -215,7 +313,7 @@ public struct ClipboardHistoryView: View {
                     .foregroundColor(.secondary)
                 Text("•")
                     .foregroundColor(.secondary.opacity(0.4))
-                Text("⌥V")
+                Text(hotkeyManager.currentSetting.displayString)
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1.5)
@@ -263,6 +361,18 @@ struct ClipboardItemRow: View {
                             .foregroundColor(.secondary)
                     }
 
+                    if let dims = item.formattedDimensions {
+                        Text(dims)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+
+                    if let size = item.formattedFileSize {
+                        Text("• \(size)")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
+
                     Spacer()
 
                     Text(item.relativeTimeString)
@@ -271,13 +381,26 @@ struct ClipboardItemRow: View {
                 }
 
                 // Main content preview
-                Text(item.text)
-                    .font(.system(size: 12))
-                    .foregroundColor(.primary)
-                    .lineLimit(3)
-                    .truncationMode(.tail)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                if item.itemType == .image, let path = item.imagePath, let nsImage = NSImage(contentsOfFile: path) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 110)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                        )
+                        .padding(.vertical, 2)
+                } else {
+                    Text(item.text)
+                        .font(.system(size: 12))
+                        .foregroundColor(.primary)
+                        .lineLimit(3)
+                        .truncationMode(.tail)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             // Quick actions
@@ -334,6 +457,7 @@ struct ClipboardItemRow: View {
 
     private var badgeColor: Color {
         switch item.category {
+        case .image: return .indigo
         case .url: return .blue
         case .color: return .purple
         case .code: return .green

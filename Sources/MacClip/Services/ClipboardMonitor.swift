@@ -39,15 +39,37 @@ public final class ClipboardMonitor {
             return
         }
 
-        // Read text content
-        guard let string = pasteboard.string(forType: .string),
-              !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return
-        }
-
-        // Get frontmost application name (the app from which the user copied)
         let sourceApp = NSWorkspace.shared.frontmostApplication?.localizedName
 
-        ClipboardHistoryStore.shared.add(text: string, sourceApp: sourceApp)
+        // 1. Check for Image content first
+        let pngType = NSPasteboard.PasteboardType("public.png")
+        let tiffType = NSPasteboard.PasteboardType.tiff
+
+        if let pngData = pasteboard.data(forType: pngType) ?? pasteboard.data(forType: tiffType),
+           let image = NSImage(data: pngData) {
+            // Convert to clean PNG representation
+            let finalData: Data?
+            if let tiffRep = image.tiffRepresentation,
+               let bitmap = NSBitmapImageRep(data: tiffRep) {
+                finalData = bitmap.representation(using: .png, properties: [:])
+            } else {
+                finalData = pngData
+            }
+
+            if let validData = finalData {
+                ClipboardHistoryStore.shared.addImage(
+                    data: validData,
+                    dimensions: image.size,
+                    sourceApp: sourceApp
+                )
+                return
+            }
+        }
+
+        // 2. Check for Text content
+        if let string = pasteboard.string(forType: .string),
+           !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            ClipboardHistoryStore.shared.addText(text: string, sourceApp: sourceApp)
+        }
     }
 }

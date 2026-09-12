@@ -36,11 +36,31 @@ public final class MenuBarController {
 
     public func showMenu() {
         let menu = NSMenu()
+        let hotkey = GlobalHotKeyManager.shared.currentSetting
 
-        let openItem = NSMenuItem(title: "Show Clipboard History", action: #selector(openClipboard), keyEquivalent: "v")
-        openItem.keyEquivalentModifierMask = [.option]
+        let openItem = NSMenuItem(
+            title: "Show Clipboard History (\(hotkey.displayString))",
+            action: #selector(openClipboard),
+            keyEquivalent: ""
+        )
         openItem.target = self
         menu.addItem(openItem)
+
+        // Shortcut submenu
+        let shortcutMenu = NSMenu()
+        for preset in HotkeySetting.presets {
+            let item = NSMenuItem(title: "\(preset.name) (\(preset.displayString))", action: #selector(changeShortcutPreset(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = preset
+            if preset.id == hotkey.id {
+                item.state = .on
+            }
+            shortcutMenu.addItem(item)
+        }
+
+        let shortcutItem = NSMenuItem(title: "Shortcut", action: nil, keyEquivalent: "")
+        shortcutItem.submenu = shortcutMenu
+        menu.addItem(shortcutItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -70,6 +90,12 @@ public final class MenuBarController {
         statusItem?.menu = menu
         statusItem?.button?.performClick(nil)
         statusItem?.menu = nil // clear menu so left-click continues toggling
+    }
+
+    @objc private func changeShortcutPreset(_ sender: NSMenuItem) {
+        if let preset = sender.representedObject as? HotkeySetting {
+            GlobalHotKeyManager.shared.updateHotkey(to: preset)
+        }
     }
 
     @objc private func openClipboard() {

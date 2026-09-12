@@ -22,7 +22,18 @@ public final class PasteManager {
 
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(item.text, forType: .string)
+
+        if item.itemType == .image, let path = item.imagePath, let imgData = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+            if let image = NSImage(data: imgData) {
+                pasteboard.writeObjects([image])
+            }
+            pasteboard.setData(imgData, forType: NSPasteboard.PasteboardType("public.png"))
+            if let tiff = NSImage(data: imgData)?.tiffRepresentation {
+                pasteboard.setData(tiff, forType: .tiff)
+            }
+        } else {
+            pasteboard.setString(item.text, forType: .string)
+        }
 
         // Reactivate previous application
         if let targetApp = targetApp, targetApp.bundleIdentifier != Bundle.main.bundleIdentifier {

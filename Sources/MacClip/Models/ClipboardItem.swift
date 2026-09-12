@@ -1,27 +1,64 @@
 import Foundation
+import AppKit
 
 public struct ClipboardItem: Identifiable, Codable, Equatable {
+    public enum ItemType: String, Codable {
+        case text
+        case image
+    }
+
     public let id: UUID
+    public var itemType: ItemType
     public let text: String
     public let timestamp: Date
     public var isPinned: Bool
     public var sourceApp: String?
+    public var imagePath: String?
+    public var imageWidth: Double?
+    public var imageHeight: Double?
+    public var imageByteSize: Int?
 
     public init(
         id: UUID = UUID(),
+        itemType: ItemType = .text,
         text: String,
         timestamp: Date = Date(),
         isPinned: Bool = false,
-        sourceApp: String? = nil
+        sourceApp: String? = nil,
+        imagePath: String? = nil,
+        imageWidth: Double? = nil,
+        imageHeight: Double? = nil,
+        imageByteSize: Int? = nil
     ) {
         self.id = id
+        self.itemType = itemType
         self.text = text
         self.timestamp = timestamp
         self.isPinned = isPinned
         self.sourceApp = sourceApp
+        self.imagePath = imagePath
+        self.imageWidth = imageWidth
+        self.imageHeight = imageHeight
+        self.imageByteSize = imageByteSize
+    }
+
+    // Custom decoder for backwards-compatibility
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.itemType = (try? container.decode(ItemType.self, forKey: .itemType)) ?? .text
+        self.text = try container.decode(String.self, forKey: .text)
+        self.timestamp = try container.decode(Date.self, forKey: .timestamp)
+        self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
+        self.sourceApp = try? container.decode(String.self, forKey: .sourceApp)
+        self.imagePath = try? container.decode(String.self, forKey: .imagePath)
+        self.imageWidth = try? container.decode(Double.self, forKey: .imageWidth)
+        self.imageHeight = try? container.decode(Double.self, forKey: .imageHeight)
+        self.imageByteSize = try? container.decode(Int.self, forKey: .imageByteSize)
     }
 
     public enum ContentCategory: String, Codable {
+        case image = "Image"
         case url = "Link"
         case color = "Color"
         case code = "Code"
@@ -30,6 +67,7 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
 
         public var iconName: String {
             switch self {
+            case .image: return "photo.fill"
             case .url: return "link"
             case .color: return "paintpalette.fill"
             case .code: return "curlybraces"
@@ -40,6 +78,10 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
     }
 
     public var category: ContentCategory {
+        if itemType == .image {
+            return .image
+        }
+
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
             return .url
@@ -63,6 +105,13 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
     }
 
     public var titlePreview: String {
+        if itemType == .image {
+            if let w = imageWidth, let h = imageHeight {
+                return "Image (\(Int(w)) × \(Int(h)))"
+            }
+            return "Copied Image"
+        }
+
         let lines = text.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         guard let firstLine = lines.first?.trimmingCharacters(in: .whitespaces) else {
             return text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -73,12 +122,17 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
         return firstLine
     }
 
-    public var lineCount: Int {
-        return text.components(separatedBy: .newlines).count
+    public var formattedDimensions: String? {
+        guard let w = imageWidth, let h = imageHeight else { return nil }
+        return "\(Int(w)) × \(Int(h))"
     }
 
-    public var charCount: Int {
-        return text.count
+    public var formattedFileSize: String? {
+        guard let bytes = imageByteSize else { return nil }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useBytes, .useKB, .useMB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
     }
 
     public var relativeTimeString: String {
@@ -94,6 +148,6 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
     }
 
     public static func == (lhs: ClipboardItem, rhs: ClipboardItem) -> Bool {
-        return lhs.id == rhs.id && lhs.isPinned == rhs.isPinned && lhs.text == rhs.text
+        return lhs.id == rhs.id && lhs.isPinned == rhs.isPinned && lhs.text == rhs.text && lhs.imagePath == rhs.imagePath
     }
 }
