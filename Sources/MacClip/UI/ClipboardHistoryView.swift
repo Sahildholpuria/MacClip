@@ -394,76 +394,99 @@ struct ClipboardItemRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            // Quick-select index tag (1..9)
-            if index < 9 {
-                Text("⌘\(index + 1)")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(Color.primary.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .padding(.top, 2)
-            } else {
-                Spacer().frame(width: 24)
-            }
-
-            VStack(alignment: .leading, spacing: 5) {
-                // Category & Metadata header
-                HStack(spacing: 6) {
-                    categoryBadge
-
-                    if let source = item.sourceApp {
-                        Text(source)
-                            .font(.system(size: 10, weight: .medium))
+        HStack(alignment: .center, spacing: 8) {
+            // Main clickable item body
+            Button(action: onSelect) {
+                HStack(alignment: .top, spacing: 10) {
+                    // Quick-select index tag (1..9)
+                    if index < 9 {
+                        Text("⌘\(index + 1)")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .foregroundColor(.secondary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.primary.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .padding(.top, 2)
+                    } else {
+                        Spacer().frame(width: 24)
                     }
 
-                    if let dims = item.formattedDimensions {
-                        Text(dims)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Category & Metadata header
+                        HStack(spacing: 6) {
+                            categoryBadge
+
+                            if let source = item.sourceApp {
+                                Text(source)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            if let dims = item.formattedDimensions {
+                                Text(dims)
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            if let size = item.formattedFileSize {
+                                Text("• \(size)")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary.opacity(0.7))
+                            }
+
+                            Spacer()
+
+                            Text(item.relativeTimeString)
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary.opacity(0.8))
+                        }
+
+                        // Main content preview
+                        if item.itemType == .image, let path = item.imagePath, let nsImage = NSImage(contentsOfFile: path) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxHeight: 110)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                                )
+                                .padding(.vertical, 2)
+                        } else {
+                            Text(item.text)
+                                .font(.system(size: 12))
+                                .foregroundColor(.primary)
+                                .lineLimit(3)
+                                .truncationMode(.tail)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-
-                    if let size = item.formattedFileSize {
-                        Text("• \(size)")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary.opacity(0.7))
-                    }
-
-                    Spacer()
-
-                    Text(item.relativeTimeString)
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary.opacity(0.8))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-
-                // Main content preview
-                if item.itemType == .image, let path = item.imagePath, let nsImage = NSImage(contentsOfFile: path) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: 110)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
-                        )
-                        .padding(.vertical, 2)
-                } else {
-                    Text(item.text)
-                        .font(.system(size: 12))
-                        .foregroundColor(.primary)
-                        .lineLimit(3)
-                        .truncationMode(.tail)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
             // Quick actions
             HStack(spacing: 4) {
+                let isHovered = ClipboardHistoryStore.shared.hoveredIndex == index
+                if isSelected || isHovered {
+                    Button(action: onSelect) {
+                        Text("Paste")
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.accentColor)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Paste into current app (↵)")
+                }
+
                 Button(action: onTogglePin) {
                     Image(systemName: item.isPinned ? "pin.fill" : "pin")
                         .font(.system(size: 11))
@@ -487,15 +510,18 @@ struct ClipboardItemRow: View {
         .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.03))
+                .fill(isSelected ? Color.accentColor.opacity(0.15) : ((ClipboardHistoryStore.shared.hoveredIndex == index) ? Color.primary.opacity(0.06) : Color.primary.opacity(0.03)))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(isSelected ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 1.5)
         )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onSelect()
+        .onHover { isHovering in
+            if isHovering {
+                ClipboardHistoryStore.shared.hoveredIndex = index
+            } else if ClipboardHistoryStore.shared.hoveredIndex == index {
+                ClipboardHistoryStore.shared.hoveredIndex = nil
+            }
         }
     }
 

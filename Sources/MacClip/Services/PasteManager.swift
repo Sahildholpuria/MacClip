@@ -50,7 +50,8 @@ public final class PasteManager: ObservableObject {
         }
     }
 
-    public func paste(item: ClipboardItem) {
+    public func paste(item: ClipboardItem, targetApp: NSRunningApplication? = nil) {
+        logTrace("PasteManager.paste itemType=\(item.itemType) targetApp=\(targetApp?.localizedName ?? "nil")")
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
@@ -62,45 +63,86 @@ public final class PasteManager: ObservableObject {
             ClipboardMonitor.shared.lastSelfPastedImageBytes = imgData.count
 
             let fileURL = URL(fileURLWithPath: path)
-            pasteboard.declareTypes([
-                .tiff,
-                NSPasteboard.PasteboardType("public.png"),
-                NSPasteboard.PasteboardType("public.file-url")
-            ], owner: nil)
+            let pbItem = NSPasteboardItem()
 
+            // Standard PNG flavor (most browsers, chat apps, electron)
+            pbItem.setData(imgData, forType: NSPasteboard.PasteboardType("public.png"))
+
+            // TIFF flavor (native Cocoa apps, Keynote, Pages)
             if let tiff = image.tiffRepresentation {
-                pasteboard.setData(tiff, forType: .tiff)
+                pbItem.setData(tiff, forType: .tiff)
             }
-            pasteboard.setData(imgData, forType: NSPasteboard.PasteboardType("public.png"))
-            pasteboard.setString(fileURL.absoluteString, forType: NSPasteboard.PasteboardType("public.file-url"))
-            pasteboard.writeObjects([image, fileURL as NSURL])
+
+            // File URL flavor (Finder, file drop targets)
+            pbItem.setString(fileURL.absoluteString, forType: NSPasteboard.PasteboardType("public.file-url"))
+
+            pasteboard.writeObjects([pbItem])
+            logTrace("Wrote image to pasteboard (PNG + TIFF + fileURL): bytes=\(imgData.count)")
         } else {
             ClipboardMonitor.shared.lastSelfPastedText = item.text
             pasteboard.setString(item.text, forType: .string)
+            logTrace("Wrote text to pasteboard: [\(item.text.prefix(30))]")
         }
 
-        // 2. Perform paste simulation
-        performPaste()
+        // 2. Hide MacClip so target app returns to foreground
+        NSApp.hide(nil)
+
+        // 3. Reactivate target application so its focused control receives keystrokes
+        if let app = targetApp {
+            logTrace("Activating targetApp: \(app.localizedName ?? "") (pid: \(app.processIdentifier))")
+            if #available(macOS 14.0, *) {
+                app.activate()
+            } else {
+                app.activate(options: [.activateIgnoringOtherApps])
+            }
+        }
+
+        // 4. Perform paste simulation
+        performPaste(targetApp: targetApp)
     }
 
-    private func performPaste() {
-        // Delay slightly for panel orderOut to restore key focus to the active application
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            // Method 1: Standard macOS CGEvent paste command via annotated session tap
-            let eventSource = CGEventSource(stateID: .combinedSessionState)
-            
-            if let eventDown = CGEvent(keyboardEventSource: eventSource, virtualKey: 9, keyDown: true),
-               let eventUp = CGEvent(keyboardEventSource: eventSource, virtualKey: 9, keyDown: false) {
-                
-                eventDown.flags = .maskCommand
-                eventUp.flags = .maskCommand
+    private func performPaste(targetApp: NSRunningApplication?) {
+        // Delay 120ms for target app activation and focus restoration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            logTrace("Executing performPaste simulation")
 
-                eventDown.post(tap: .cgAnnotatedSessionEventTap)
-                eventUp.post(tap: .cgAnnotatedSessionEventTap)
+            if let app = targetApp, !app.isActive {
+                if #available(macOS 14.0, *) {
+                    app.activate()
+                } else {
+                    app.activate(options: [.activateIgnoringOtherApps])
+                }
             }
 
-            // Method 2: Also run AppleScript System Events if accessibility is in transition
+            let source = CGEventSource(stateID: .combinedSessionState)
+            source?.setLocalEventsFilterDuringSuppressionState(
+                [.permitLocalMouseEvents, .permitSystemDefinedEvents],
+                state: .eventSuppressionStateSuppressionInterval
+            )
+
+            // Add hardware modifier flag (0x000008) so macOS hardware layer recognizes Command key
+            let cmdFlag = CGEventFlags(rawValue: UInt64(CGEventFlags.maskCommand.rawValue) | 0x000008)
+            let vKeyCode: CGKeyCode = 9 // ANSI 'v'
+
+            guard let eventDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true),
+                  let eventUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) else {
+                logTrace("Failed to create CGEvent for paste")
+                return
+            }
+
+            eventDown.flags = cmdFlag
+            eventUp.flags = cmdFlag
+
+            // Post to hardware HID tap
+            eventDown.post(tap: .cghidEventTap)
+            usleep(25000) // 25ms gap between key down and key up
+            eventUp.post(tap: .cghidEventTap)
+
+            logTrace("CGEvent Cmd+V posted to cghidEventTap successfully!")
+
+            // Failsafe: If Accessibility is not trusted, also try System Events keystroke
             if !AXIsProcessTrusted() {
+                logTrace("Accessibility not trusted, attempting System Events fallback")
                 let scriptSource = "tell application \"System Events\" to keystroke \"v\" using command down"
                 if let script = NSAppleScript(source: scriptSource) {
                     var error: NSDictionary?

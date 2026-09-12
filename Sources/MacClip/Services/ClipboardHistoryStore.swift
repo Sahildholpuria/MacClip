@@ -12,6 +12,7 @@ public final class ClipboardHistoryStore: ObservableObject {
         }
     }
     @Published public var selectedIndex: Int = 0
+    @Published public var hoveredIndex: Int? = nil
     @Published public var isSettingsOpen: Bool = false
 
     private let maxHistoryCount = 150

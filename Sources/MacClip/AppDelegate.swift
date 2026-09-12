@@ -6,6 +6,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var panel: FloatingPanel?
     private var menuBarController: MenuBarController?
+    public private(set) var targetApp: NSRunningApplication?
 
     public override init() {
         super.init()
@@ -13,6 +14,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        logTrace("MacClip applicationDidFinishLaunching")
+
         // Start clipboard change observer
         ClipboardMonitor.shared.startMonitoring()
 
@@ -52,12 +55,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func showPanel() {
         guard let panel = panel else { return }
 
+        // Capture frontmost application before showing the panel
+        if let front = NSWorkspace.shared.frontmostApplication,
+           front.bundleIdentifier != Bundle.main.bundleIdentifier {
+            self.targetApp = front
+            logTrace("Captured targetApp: \(front.localizedName ?? "") (\(front.bundleIdentifier ?? ""))")
+        }
+
         // Recheck accessibility permission on show
         PasteManager.shared.checkAccessibility()
 
         // Reset search query, selection, and settings on show
         ClipboardHistoryStore.shared.searchText = ""
         ClipboardHistoryStore.shared.selectedIndex = 0
+        ClipboardHistoryStore.shared.hoveredIndex = nil
         ClipboardHistoryStore.shared.isSettingsOpen = false
 
         // Attach fresh NSHostingView so all items render with up-to-date state
@@ -73,16 +84,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.positionNearMouseOrCenter()
         panel.makeKeyAndOrderFront(nil)
-        // Kept non-activating so the active app's text cursor remains focused
+        panel.startClickOutsideMonitor()
     }
 
     public func hidePanel() {
+        panel?.stopClickOutsideMonitor()
         panel?.orderOut(nil)
     }
 
     public func paste(item: ClipboardItem) {
+        let target = self.targetApp
+        logTrace("AppDelegate.paste invoked for item: \(item.id), targetApp: \(target?.localizedName ?? "nil")")
         hidePanel()
-        PasteManager.shared.paste(item: item)
+        PasteManager.shared.paste(item: item, targetApp: target)
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

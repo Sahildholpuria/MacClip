@@ -2,6 +2,8 @@ import AppKit
 import SwiftUI
 
 public final class FloatingPanel: NSPanel {
+    private var clickOutsideMonitor: Any?
+
     public init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
@@ -20,20 +22,24 @@ public final class FloatingPanel: NSPanel {
         self.titlebarAppearsTransparent = true
         self.isMovableByWindowBackground = true
         self.animationBehavior = .utilityWindow
-
-        // Auto-dismiss when clicking outside
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(panelDidResignKey),
-            name: NSWindow.didResignKeyNotification,
-            object: self
-        )
     }
 
-    @objc private func panelDidResignKey() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+    public func startClickOutsideMonitor() {
+        stopClickOutsideMonitor()
+        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self = self, self.isVisible else { return }
-            self.orderOut(nil)
+            let mouseLoc = NSEvent.mouseLocation
+            if !self.frame.contains(mouseLoc) {
+                logTrace("Click outside panel detected at \(mouseLoc), hiding panel")
+                AppDelegate.shared?.hidePanel()
+            }
+        }
+    }
+
+    public func stopClickOutsideMonitor() {
+        if let monitor = clickOutsideMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickOutsideMonitor = nil
         }
     }
 
@@ -46,52 +52,55 @@ public final class FloatingPanel: NSPanel {
     }
 
     public override func cancelOperation(_ sender: Any?) {
-        self.orderOut(nil)
+        AppDelegate.shared?.hidePanel()
     }
 
-    public override func keyDown(with event: NSEvent) {
-        let store = ClipboardHistoryStore.shared
-        let count = store.filteredItems.count
+    public override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown {
+            let store = ClipboardHistoryStore.shared
+            let count = store.filteredItems.count
 
-        // Check for Cmd + 1..9 shortcuts
-        if event.modifierFlags.contains(.command) {
-            let numberKeyCodes: [UInt16: Int] = [
-                18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6, 28: 7, 25: 8
-            ]
-            if let targetIdx = numberKeyCodes[event.keyCode], targetIdx < count {
-                let item = store.filteredItems[targetIdx]
-                AppDelegate.shared?.paste(item: item)
+            // Check for Cmd + 1..9 shortcuts
+            if event.modifierFlags.contains(.command) {
+                let numberKeyCodes: [UInt16: Int] = [
+                    18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6, 28: 7, 25: 8
+                ]
+                if let targetIdx = numberKeyCodes[event.keyCode], targetIdx < count {
+                    let item = store.filteredItems[targetIdx]
+                    AppDelegate.shared?.paste(item: item)
+                    return
+                }
+            }
+
+            switch event.keyCode {
+            case 53: // Escape
+                AppDelegate.shared?.hidePanel()
                 return
+
+            case 126: // Up Arrow
+                if count > 0 {
+                    store.selectedIndex = (store.selectedIndex - 1 + count) % count
+                }
+                return
+
+            case 125: // Down Arrow
+                if count > 0 {
+                    store.selectedIndex = (store.selectedIndex + 1) % count
+                }
+                return
+
+            case 36: // Return / Enter
+                if !store.isSettingsOpen && count > 0 && store.selectedIndex < count {
+                    let item = store.filteredItems[store.selectedIndex]
+                    AppDelegate.shared?.paste(item: item)
+                    return
+                }
+
+            default:
+                break
             }
         }
-
-        switch event.keyCode {
-        case 53: // Escape
-            self.orderOut(nil)
-            return
-
-        case 126: // Up Arrow
-            if count > 0 {
-                store.selectedIndex = (store.selectedIndex - 1 + count) % count
-            }
-            return
-
-        case 125: // Down Arrow
-            if count > 0 {
-                store.selectedIndex = (store.selectedIndex + 1) % count
-            }
-            return
-
-        case 36: // Return / Enter
-            if count > 0 && store.selectedIndex < count {
-                let item = store.filteredItems[store.selectedIndex]
-                AppDelegate.shared?.paste(item: item)
-            }
-            return
-
-        default:
-            super.keyDown(with: event)
-        }
+        super.sendEvent(event)
     }
 
     public func positionNearMouseOrCenter() {
@@ -118,6 +127,6 @@ public final class FloatingPanel: NSPanel {
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
+        stopClickOutsideMonitor()
     }
 }
