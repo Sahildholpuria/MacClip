@@ -1,0 +1,83 @@
+name: Build Universal macOS DMG
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Universal DMG (Apple Silicon + Intel)
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Universal Binary
+        run: |
+          swift build -c release --arch arm64 --arch x86_64
+          echo "Universal binary successfully built:"
+          file .build/apple/Products/Release/MacClip
+
+      - name: Package Universal MacClip.app
+        run: |
+          APP_DIR="build/MacClip.app"
+          mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+          cp .build/apple/Products/Release/MacClip "$APP_DIR/Contents/MacOS/MacClip"
+          chmod +x "$APP_DIR/Contents/MacOS/MacClip"
+          cp AppIcon.icns "$APP_DIR/Contents/Resources/"
+          
+          cat << 'PLIST' > "$APP_DIR/Contents/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>en</string>
+              <key>CFBundleExecutable</key>
+              <string>MacClip</string>
+              <key>CFBundleIconFile</key>
+              <string>AppIcon</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.sahildholpuria.MacClip</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>MacClip</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.1</string>
+              <key>CFBundleVersion</key>
+              <string>2</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>12.0</string>
+              <key>LSUIElement</key>
+              <true/>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+              <key>NSHumanReadableCopyright</key>
+              <string>Copyright © 2026. All rights reserved.</string>
+          </dict>
+          </plist>
+          PLIST
+          
+          codesign --force --deep --sign - "$APP_DIR"
+
+      - name: Create DMG Installer
+        run: |
+          mkdir -p dist staging
+          cp -R build/MacClip.app staging/MacClip.app
+          ln -s /Applications staging/Applications
+          hdiutil create -volname "MacClip" -srcfolder staging -ov -format UDZO dist/MacClip-Universal.dmg
+          codesign --force --sign - dist/MacClip-Universal.dmg
+          rm -rf staging
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacClip-Universal-DMG
+          path: dist/MacClip-Universal.dmg

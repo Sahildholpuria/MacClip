@@ -26,7 +26,7 @@ if [ -f "$DIR/AppIcon.icns" ]; then
     cp "$DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 fi
 
-# Write Info.plist
+# Write Info.plist with macOS 12+ compatibility
 cat << 'PLIST' > "$CONTENTS_DIR/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -51,7 +51,7 @@ cat << 'PLIST' > "$CONTENTS_DIR/Info.plist"
     <key>CFBundleVersion</key>
     <string>2</string>
     <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
+    <string>12.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHighResolutionCapable</key>

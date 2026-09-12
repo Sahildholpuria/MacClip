@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "MacClip",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v12)
     ],
     products: [
         .executable(name: "MacClip", targets: ["MacClip"])
