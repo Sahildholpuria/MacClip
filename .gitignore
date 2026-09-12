@@ -15,3 +15,5 @@ DerivedData/
 
 # User data
 xcuserdata/
+dist/
+*.dmg
