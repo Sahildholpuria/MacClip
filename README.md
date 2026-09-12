@@ -8,6 +8,10 @@ Built with **Swift**, **SwiftUI**, and **AppKit** for Apple Silicon and macOS 13
 
 ## ✨ Features
 
+- **Quick Look Interactive Preview (`Space` or `⌘Y`) 🔍**: Instant interactive preview modal for any selected clip! Zoom full-resolution images with dimension badges, inspect hex colors with real-time format conversions (HEX, RGB, HSL), view and clean URLs by stripping tracking parameters (`utm_*`, `fbclid`), view text statistics (characters, words, lines), prettify raw JSON, and apply quick case transforms (UPPERCASE, lowercase, Title Case).
+- **Paste as Plain Text (`⇧↵`) 📝**: Hold `Shift` while pressing `Enter` (or click `⇧↵ Plain`) to strip all rich formatting, fonts, inline styles, and web artifacts, pasting pure clean unformatted text directly into your target app.
+- **Password Manager Auto-Ignore 🛡️**: Automatically respects your privacy by ignoring clips copied from sensitive password managers (1Password, Bitwarden, Apple Passwords, Keychain, KeePassXC, LastPass) or clips tagged with concealed/transient clipboard markers. Easily toggle on or off in Settings.
+- **Launch at Login 🚀**: One-click toggle using native macOS `SMAppService` to automatically start MacClip seamlessly on system login.
 - **Customizable Global Hotkey ⌨️**: Record and set **any custom key combination** you prefer (e.g. `⌘⇧C`, `⌃⌥Space`, `⌥⌘V`, `⌘⇧V`, etc.) with interactive live key capture, or choose from popular presets (`⌥V`, `⌘⇧V`, `⌥⌘V`, `⌃V`, `⌥Space`).
   *(Change via the ⚙️ Settings slider in the app or directly from the Menu Bar menu)*.
 - **Apple Liquid Glass UI 🪟**: Translucent glass materials, specular border highlights, smooth spring animations, and amber alert glass banners.
@@ -29,9 +33,11 @@ Built with **Swift**, **SwiftUI**, and **AppKit** for Apple Silicon and macOS 13
 |---|---|
 | **`⌥ + V`** *(or your custom hotkey)* | Toggle Clipboard History Popup |
 | **`⌘ + 1` .. `⌘ + 9`** | Instantly paste item 1 through 9 |
-| **`↑` / `↓`** | Navigate through clips and images |
-| **`↵`** (Return) | Paste selected item |
-| **`Esc`** | Dismiss clipboard popup |
+| **`↑` / `↓`** | Navigate through clips and images (updates Quick Look preview live) |
+| **`↵`** (Return) | Paste selected item into active app |
+| **`⇧ + ↵`** (Shift + Return) | Paste selected item as **Plain Text** |
+| **`Space`** or **`⌘ + Y`** | Open / close **Quick Look Preview** |
+| **`Esc`** | Dismiss Quick Look preview or dismiss clipboard popup |
 | **Click outside** | Auto-closes popup |
 
 ---

@@ -39,6 +39,12 @@ public final class ClipboardHistoryStore: ObservableObject {
     @Published public var selectedIndex: Int = 0
     @Published public var hoveredIndex: Int? = nil
     @Published public var isSettingsOpen: Bool = false
+    @Published public var previewItem: ClipboardItem? = nil
+    @Published public var ignorePasswordManagers: Bool = true {
+        didSet {
+            UserDefaults.standard.set(ignorePasswordManagers, forKey: "MacClip_IgnorePasswordManagers")
+        }
+    }
 
     private let maxHistoryCount = 150
     private let storageURL: URL
@@ -56,7 +62,25 @@ public final class ClipboardHistoryStore: ObservableObject {
         self.storageURL = appDir.appendingPathComponent("history.json")
         self.imagesDirectoryURL = imgDir
 
+        if UserDefaults.standard.object(forKey: "MacClip_IgnorePasswordManagers") != nil {
+            self.ignorePasswordManagers = UserDefaults.standard.bool(forKey: "MacClip_IgnorePasswordManagers")
+        } else {
+            self.ignorePasswordManagers = true
+        }
+
         loadHistory()
+    }
+
+    public func togglePreview(for item: ClipboardItem?) {
+        if let item = item, previewItem?.id == item.id {
+            previewItem = nil
+        } else {
+            previewItem = item
+        }
+    }
+
+    public func closePreview() {
+        previewItem = nil
     }
 
     public func count(for category: FilterCategory) -> Int {

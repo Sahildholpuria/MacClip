@@ -5,6 +5,7 @@ public struct ClipboardHistoryView: View {
     @ObservedObject var store = ClipboardHistoryStore.shared
     @ObservedObject var hotkeyManager = GlobalHotKeyManager.shared
     @ObservedObject var pasteManager = PasteManager.shared
+    @ObservedObject var launchManager = LaunchAtLoginManager.shared
 
     public var onSelect: ((ClipboardItem) -> Void)?
     public var onClose: (() -> Void)?
@@ -23,14 +24,14 @@ public struct ClipboardHistoryView: View {
                 .padding(.bottom, 8)
 
             // Category Filter Pills (All, Pinned, Text, Images, Links)
-            if !store.isSettingsOpen {
+            if !store.isSettingsOpen && store.previewItem == nil {
                 categoryFilterBar
                     .padding(.horizontal, 14)
                     .padding(.bottom, 10)
             }
 
             // Accessibility Notice (Liquid Amber Glass Banner)
-            if !pasteManager.isAccessibilityGranted && !pasteManager.isBannerDismissed && !store.isSettingsOpen {
+            if !pasteManager.isAccessibilityGranted && !pasteManager.isBannerDismissed && !store.isSettingsOpen && store.previewItem == nil {
                 accessibilityBanner
                     .padding(.horizontal, 14)
                     .padding(.bottom, 10)
@@ -42,6 +43,8 @@ public struct ClipboardHistoryView: View {
             // Content Area
             if store.isSettingsOpen {
                 settingsView
+            } else if let preview = store.previewItem {
+                quickLookView(item: preview)
             } else if store.filteredItems.isEmpty {
                 emptyStateView
             } else {
@@ -141,6 +144,54 @@ public struct ClipboardHistoryView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Close (Esc)")
+            } else if store.previewItem != nil {
+                Button(action: {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                        store.closePreview()
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("List")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.08))
+                    .foregroundColor(.primary)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.8)
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("Quick Look")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                Button(action: {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                        store.closePreview()
+                    }
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.secondary)
+                        .padding(7)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.8)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Close Preview (Space / Esc)")
             } else {
                 // Search Pill
                 HStack(spacing: 8) {
@@ -585,6 +636,73 @@ public struct ClipboardHistoryView: View {
                         .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
                 )
 
+                // Launch at Login Card
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.accentColor)
+                            Text("Launch at Login")
+                                .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        }
+                        Text("Automatically start MacClip when you log in")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+
+                    Toggle("", isOn: Binding(
+                        get: { launchManager.isEnabled },
+                        set: { launchManager.setEnabled($0) }
+                    ))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                )
+
+                // Password Manager Privacy Card
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.purple)
+                            Text("Ignore Password Managers")
+                                .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        }
+                        Text("Never save clips from 1Password, Bitwarden, or Keychain")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+
+                    Toggle("", isOn: $store.ignorePasswordManagers)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                )
+
                 // Done Button
                 HStack {
                     Spacer()
@@ -688,6 +806,407 @@ public struct ClipboardHistoryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Quick Look View
+    private func quickLookView(item: ClipboardItem) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Header Metadata Bar
+                HStack(spacing: 8) {
+                    categoryBadge(for: item)
+
+                    if let source = item.sourceApp {
+                        HStack(spacing: 3) {
+                            Image(systemName: "app.fill")
+                                .font(.system(size: 9))
+                            Text(source)
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                        }
+                        .foregroundColor(.secondary)
+                    }
+
+                    if let dims = item.formattedDimensions {
+                        Text(dims)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+
+                    if let size = item.formattedFileSize {
+                        Text("• \(size)")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
+
+                    Spacer()
+
+                    Text(item.relativeTimeString)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+                .padding(.horizontal, 4)
+
+                // Preview Content Area
+                if item.itemType == .image, let path = item.imagePath, let nsImage = NSImage(contentsOfFile: path) {
+                    // IMAGE PREVIEW
+                    VStack(spacing: 12) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity, maxHeight: 250)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.15), radius: 8, y: 4)
+
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                NSWorkspace.shared.open(URL(fileURLWithPath: path))
+                            }) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "arrow.up.right.square")
+                                        .font(.system(size: 11))
+                                    Text("Open in Preview")
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.white.opacity(0.08))
+                                .foregroundColor(.primary)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.8))
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer()
+
+                            Button(action: {
+                                onSelect?(item)
+                            }) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "arrow.turn.down.left")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text("Paste Image (↵)")
+                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                    )
+                } else if item.category == .color {
+                    // COLOR PREVIEW
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 14) {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color(hexString: item.text))
+                                .frame(width: 70, height: 70)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+                                )
+                                .shadow(color: Color.black.opacity(0.15), radius: 6, y: 3)
+
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(item.text)
+                                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.primary)
+
+                                Text("Hex Color Code")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            Button("Copy HEX") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(item.text, forType: .string)
+                            }
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            Spacer()
+
+                            Button(action: {
+                                onSelect?(item)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.turn.down.left")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text("Paste (↵)")
+                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                    )
+                } else if item.category == .url {
+                    // URL PREVIEW
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "link.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue)
+
+                            if let url = URL(string: item.text), let host = url.host {
+                                Text(host)
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                            }
+                        }
+
+                        Text(item.text)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .lineLimit(4)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.white.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                        HStack(spacing: 8) {
+                            if let url = URL(string: item.text) {
+                                Button("Open Browser") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+
+                            let clean = cleanURL(item.text)
+                            if clean != item.text {
+                                Button("Clean URL") {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(clean, forType: .string)
+                                }
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+
+                            Spacer()
+
+                            Button(action: {
+                                onSelect?(item)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.turn.down.left")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text("Paste (↵)")
+                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                    )
+                } else {
+                    // TEXT / CODE PREVIEW
+                    VStack(alignment: .leading, spacing: 10) {
+                        // Stats line
+                        HStack(spacing: 8) {
+                            let charCount = item.text.count
+                            let wordCount = item.text.split { $0.isWhitespace || $0.isNewline }.count
+                            let lineCount = item.text.split(separator: "\n", omittingEmptySubsequences: false).count
+
+                            Text("\(charCount) chars")
+                                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                                .foregroundColor(.secondary)
+                            Text("•")
+                                .foregroundColor(.secondary.opacity(0.5))
+                            Text("\(wordCount) words")
+                                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                                .foregroundColor(.secondary)
+                            Text("•")
+                                .foregroundColor(.secondary.opacity(0.5))
+                            Text("\(lineCount) lines")
+                                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+
+                        // Scrollable full text
+                        ScrollView {
+                            Text(item.text)
+                                .font(.system(size: 12, design: item.category == .code ? .monospaced : .default))
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                        }
+                        .frame(maxHeight: 200)
+                        .background(Color.white.opacity(0.03))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.white.opacity(0.07), lineWidth: 0.8)
+                        )
+
+                        // Quick Transformation Pills
+                        HStack(spacing: 5) {
+                            Button("UPPER") {
+                                let transformed = item.text.uppercased()
+                                AppDelegate.shared?.paste(item: ClipboardItem(text: transformed), plainText: true)
+                            }
+                            .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+
+                            Button("lower") {
+                                let transformed = item.text.lowercased()
+                                AppDelegate.shared?.paste(item: ClipboardItem(text: transformed), plainText: true)
+                            }
+                            .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+
+                            Button("Title Case") {
+                                let transformed = item.text.capitalized
+                                AppDelegate.shared?.paste(item: ClipboardItem(text: transformed), plainText: true)
+                            }
+                            .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+
+                            if let pretty = prettifyJSON(item.text) {
+                                Button("Format JSON") {
+                                    AppDelegate.shared?.paste(item: ClipboardItem(text: pretty), plainText: true)
+                                }
+                                .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                                .buttonStyle(.bordered)
+                                .controlSize(.mini)
+                            }
+
+                            Spacer()
+
+                            Button("Copy") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(item.text, forType: .string)
+                            }
+                            .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            Button(action: {
+                                AppDelegate.shared?.paste(item: item, plainText: true)
+                            }) {
+                                Text("⇧↵ Plain")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.1))
+                                    .foregroundColor(.primary)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.6))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Paste as plain text (⇧↵)")
+
+                            Button(action: {
+                                onSelect?(item)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.turn.down.left")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text("Paste (↵)")
+                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                    )
+                }
+            }
+            .padding(14)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func categoryBadge(for item: ClipboardItem) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: item.category.iconName)
+                .font(.system(size: 9.5))
+            Text(item.category.rawValue)
+                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(badgeColor(for: item).opacity(0.18))
+        .foregroundColor(badgeColor(for: item))
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .stroke(badgeColor(for: item).opacity(0.25), lineWidth: 0.6)
+        )
+    }
+
+    private func badgeColor(for item: ClipboardItem) -> Color {
+        switch item.category {
+        case .image: return .indigo
+        case .url: return .blue
+        case .color: return .purple
+        case .code: return .green
+        case .email: return .orange
+        case .text: return .secondary
+        }
+    }
+
     // MARK: - Footer
     private var footerView: some View {
         HStack {
@@ -742,24 +1261,48 @@ public struct ClipboardHistoryView: View {
             }
 
             // Keyboard hints
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 HStack(spacing: 2) {
                     Text("↵")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                     Text("Paste")
-                        .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
                 }
                 .foregroundColor(.secondary)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2.5)
+                .padding(.horizontal, 4.5)
+                .padding(.vertical, 2)
+                .background(Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                HStack(spacing: 2) {
+                    Text("⇧↵")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    Text("Plain")
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 4.5)
+                .padding(.vertical, 2)
+                .background(Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                HStack(spacing: 2) {
+                    Text("Space")
+                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                    Text("Preview")
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 4.5)
+                .padding(.vertical, 2)
                 .background(Color.white.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
 
                 Text(hotkeyManager.currentSetting.displayString)
-                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2.5)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
                     .background(Color.white.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .overlay(
@@ -878,10 +1421,26 @@ struct ClipboardItemRow: View {
             }
             .buttonStyle(.plain)
 
-            // Actions: Paste, Pin, Trash
+            // Actions: Quick Look, Paste, Pin, Trash
             HStack(spacing: 5) {
                 let isHovered = ClipboardHistoryStore.shared.hoveredIndex == index
                 if isSelected || isHovered {
+                    Button(action: {
+                        ClipboardHistoryStore.shared.togglePreview(for: item)
+                    }) {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                            .padding(5.5)
+                            .background(Color.white.opacity(0.08))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.6)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Quick Look preview (Space)")
+
                     Button(action: onSelect) {
                         HStack(spacing: 3) {
                             Image(systemName: "arrow.turn.down.left")
@@ -906,7 +1465,7 @@ struct ClipboardItemRow: View {
                         .shadow(color: Color.accentColor.opacity(0.35), radius: 4, y: 1)
                     }
                     .buttonStyle(.plain)
-                    .help("Paste into current app (↵)")
+                    .help("Paste into current app (↵) • Hold Shift for plain text (⇧↵)")
                 }
 
                 Button(action: onTogglePin) {
@@ -1044,5 +1603,52 @@ struct VisualEffectBackground: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.layer?.cornerRadius = 22
         nsView.layer?.masksToBounds = true
+    }
+}
+
+// MARK: - Helper Functions
+func prettifyJSON(_ str: String) -> String? {
+    guard let data = str.data(using: .utf8),
+          let json = try? JSONSerialization.jsonObject(with: data, options: []),
+          let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]),
+          let prettyString = String(data: prettyData, encoding: .utf8) else {
+        return nil
+    }
+    return prettyString
+}
+
+func cleanURL(_ urlString: String) -> String {
+    guard let url = URL(string: urlString),
+          var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+        return urlString
+    }
+    let trackingParams: Set<String> = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "msclkid", "ref"]
+    components.queryItems = components.queryItems?.filter { !trackingParams.contains($0.name.lowercased()) }
+    return components.string ?? urlString
+}
+
+extension Color {
+    init(hexString: String) {
+        let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }

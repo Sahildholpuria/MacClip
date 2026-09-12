@@ -129,25 +129,56 @@ public final class FloatingPanel: NSPanel {
 
             switch event.keyCode {
             case 53: // Escape
+                if store.previewItem != nil {
+                    store.previewItem = nil
+                    return
+                }
                 AppDelegate.shared?.hidePanel()
                 return
 
             case 126: // Up Arrow
                 if count > 0 {
                     store.selectedIndex = (store.selectedIndex - 1 + count) % count
+                    if store.previewItem != nil {
+                        store.previewItem = store.filteredItems[store.selectedIndex]
+                    }
                 }
                 return
 
             case 125: // Down Arrow
                 if count > 0 {
                     store.selectedIndex = (store.selectedIndex + 1) % count
+                    if store.previewItem != nil {
+                        store.previewItem = store.filteredItems[store.selectedIndex]
+                    }
                 }
                 return
 
             case 36: // Return / Enter
+                if !store.isSettingsOpen && count > 0 {
+                    let targetItem = store.previewItem ?? (store.selectedIndex < count ? store.filteredItems[store.selectedIndex] : nil)
+                    if let item = targetItem {
+                        let isShift = event.modifierFlags.contains(.shift)
+                        AppDelegate.shared?.paste(item: item, plainText: isShift)
+                        return
+                    }
+                }
+
+            case 49: // Spacebar (Quick Look Preview)
+                let isEditingField = (self.firstResponder as? NSTextView)?.isFieldEditor == true
+                if isEditingField && !event.modifierFlags.contains(.command) {
+                    break
+                }
                 if !store.isSettingsOpen && count > 0 && store.selectedIndex < count {
-                    let item = store.filteredItems[store.selectedIndex]
-                    AppDelegate.shared?.paste(item: item)
+                    let currentItem = store.filteredItems[store.selectedIndex]
+                    store.togglePreview(for: currentItem)
+                    return
+                }
+
+            case 16: // Cmd + Y (Quick Look Preview shortcut)
+                if event.modifierFlags.contains(.command) && !store.isSettingsOpen && count > 0 && store.selectedIndex < count {
+                    let currentItem = store.filteredItems[store.selectedIndex]
+                    store.togglePreview(for: currentItem)
                     return
                 }
 

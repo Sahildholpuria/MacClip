@@ -65,10 +65,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Recheck accessibility permission on show
         PasteManager.shared.checkAccessibility()
 
-        // Reset search query, selection, and settings on show
+        // Reset search query, selection, settings, and preview on show
         ClipboardHistoryStore.shared.searchText = ""
         ClipboardHistoryStore.shared.selectedIndex = 0
         ClipboardHistoryStore.shared.hoveredIndex = nil
+        ClipboardHistoryStore.shared.previewItem = nil
         ClipboardHistoryStore.shared.isSettingsOpen = showSettings
 
         // Attach fresh NSHostingView so all items render with up-to-date state
@@ -98,15 +99,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func hidePanel() {
         GlobalHotKeyManager.shared.stopRecording(cancelled: true)
+        ClipboardHistoryStore.shared.previewItem = nil
         panel?.stopClickOutsideMonitor()
         panel?.orderOut(nil)
     }
 
-    public func paste(item: ClipboardItem) {
+    public func paste(item: ClipboardItem, plainText: Bool = false) {
         let target = self.targetApp
-        logTrace("AppDelegate.paste invoked for item: \(item.id), targetApp: \(target?.localizedName ?? "nil")")
+        logTrace("AppDelegate.paste invoked for item: \(item.id), plainText: \(plainText), targetApp: \(target?.localizedName ?? "nil")")
         hidePanel()
-        PasteManager.shared.paste(item: item, targetApp: target)
+        PasteManager.shared.paste(item: item, targetApp: target, plainText: plainText)
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

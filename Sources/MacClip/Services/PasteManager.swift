@@ -50,13 +50,13 @@ public final class PasteManager: ObservableObject {
         }
     }
 
-    public func paste(item: ClipboardItem, targetApp: NSRunningApplication? = nil) {
-        logTrace("PasteManager.paste itemType=\(item.itemType) targetApp=\(targetApp?.localizedName ?? "nil")")
+    public func paste(item: ClipboardItem, targetApp: NSRunningApplication? = nil, plainText: Bool = false) {
+        logTrace("PasteManager.paste itemType=\(item.itemType) plainText=\(plainText) targetApp=\(targetApp?.localizedName ?? "nil")")
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
-        // 1. Write item to pasteboard in all supported formats
-        if item.itemType == .image, let path = item.imagePath,
+        // 1. Write item to pasteboard
+        if !plainText, item.itemType == .image, let path = item.imagePath,
            let imgData = try? Data(contentsOf: URL(fileURLWithPath: path)),
            let image = NSImage(data: imgData) {
             
@@ -81,7 +81,7 @@ public final class PasteManager: ObservableObject {
         } else {
             ClipboardMonitor.shared.lastSelfPastedText = item.text
             pasteboard.setString(item.text, forType: .string)
-            logTrace("Wrote text to pasteboard: [\(item.text.prefix(30))]")
+            logTrace("Wrote plain text to pasteboard: [\(item.text.prefix(30))]")
         }
 
         // 2. Hide MacClip so target app returns to foreground
