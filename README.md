@@ -36,6 +36,12 @@ Built with **Swift**, **SwiftUI**, and **AppKit** for Apple Silicon and macOS 13
 
 ---
 
+<img width="452" height="582" alt="image" src="https://github.com/user-attachments/assets/7aea9ece-370b-4f70-a4df-93ec5c5060d5" />
+
+
+<img width="444" height="575" alt="image" src="https://github.com/user-attachments/assets/e60e1654-0f84-4a99-b203-81dcc4710cac" />
+
+
 ## 🚀 How to Launch
 
 The app is already compiled and installed in your `~/Applications` folder.
