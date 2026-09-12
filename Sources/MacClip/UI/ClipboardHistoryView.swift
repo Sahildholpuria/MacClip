@@ -85,6 +85,11 @@ public struct ClipboardHistoryView: View {
                 TextField("Search clips & images...", text: $store.searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                    .onSubmit {
+                        if !store.filteredItems.isEmpty && store.selectedIndex < store.filteredItems.count {
+                            onSelect?(store.filteredItems[store.selectedIndex])
+                        }
+                    }
 
                 if !store.searchText.isEmpty {
                     Button(action: { store.searchText = "" }) {
