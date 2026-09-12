@@ -284,15 +284,18 @@ public struct ClipboardHistoryView: View {
                                 store.delete(id: item.id)
                             }
                         )
-                        .id(index)
+                        .id(item.id)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
             .onChange(of: store.selectedIndex) { targetIdx in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    proxy.scrollTo(targetIdx, anchor: .center)
+                if targetIdx >= 0 && targetIdx < store.filteredItems.count {
+                    let targetId = store.filteredItems[targetIdx].id
+                    withAnimation(.easeInOut(duration: 0.12)) {
+                        proxy.scrollTo(targetId, anchor: .center)
+                    }
                 }
             }
         }

@@ -6,7 +6,11 @@ public final class ClipboardHistoryStore: ObservableObject {
     public static let shared = ClipboardHistoryStore()
 
     @Published public var items: [ClipboardItem] = []
-    @Published public var searchText: String = ""
+    @Published public var searchText: String = "" {
+        didSet {
+            selectedIndex = 0
+        }
+    }
     @Published public var selectedIndex: Int = 0
     @Published public var isSettingsOpen: Bool = false
 
@@ -30,10 +34,10 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
 
     public var filteredItems: [ClipboardItem] {
-        if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if query.isEmpty {
             return items
         }
-        let query = searchText.lowercased()
         return items.filter { item in
             if item.text.lowercased().contains(query) { return true }
             if let source = item.sourceApp, source.lowercased().contains(query) { return true }
@@ -49,71 +53,88 @@ public final class ClipboardHistoryStore: ObservableObject {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        // Skip if identical to top item
-        if let first = items.first, first.itemType == .text && first.text == text {
-            return
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            // Skip if identical to top item
+            if let first = self.items.first, first.itemType == .text && first.text == text {
+                return
+            }
+
+            // Move to top if already existing
+            var wasPinned = false
+            if let index = self.items.firstIndex(where: { $0.itemType == .text && $0.text == text }) {
+                wasPinned = self.items[index].isPinned
+                self.items.remove(at: index)
+            }
+
+            let newItem = ClipboardItem(
+                itemType: .text,
+                text: text,
+                timestamp: Date(),
+                isPinned: wasPinned,
+                sourceApp: sourceApp
+            )
+
+            self.objectWillChange.send()
+            self.items.insert(newItem, at: 0)
+            self.pruneExcessItems()
+            self.selectedIndex = 0
+            self.saveHistory()
         }
-
-        // Move to top if already existing
-        var wasPinned = false
-        if let index = items.firstIndex(where: { $0.itemType == .text && $0.text == text }) {
-            wasPinned = items[index].isPinned
-            items.remove(at: index)
-        }
-
-        let newItem = ClipboardItem(
-            itemType: .text,
-            text: text,
-            timestamp: Date(),
-            isPinned: wasPinned,
-            sourceApp: sourceApp
-        )
-
-        items.insert(newItem, at: 0)
-        pruneExcessItems()
-        selectedIndex = 0
-        saveHistory()
     }
 
     public func addImage(data: Data, dimensions: CGSize, sourceApp: String? = nil) {
         guard !data.isEmpty else { return }
 
-        // Skip if identical to top item
-        if let first = items.first, first.itemType == .image,
-           first.imageByteSize == data.count,
-           first.imageWidth == Double(dimensions.width),
-           first.imageHeight == Double(dimensions.height) {
-            return
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            // Skip if identical to top item
+            if let first = self.items.first, first.itemType == .image,
+               first.imageByteSize == data.count,
+               first.imageWidth == Double(dimensions.width),
+               first.imageHeight == Double(dimensions.height) {
+                return
+            }
+
+            var wasPinned = false
+            if let index = self.items.firstIndex(where: { $0.itemType == .image && $0.imageByteSize == data.count && $0.imageWidth == Double(dimensions.width) && $0.imageHeight == Double(dimensions.height) }) {
+                wasPinned = self.items[index].isPinned
+                let oldItem = self.items.remove(at: index)
+                self.deleteImageFile(for: oldItem)
+            }
+
+            let id = UUID()
+            let fileURL = self.imagesDirectoryURL.appendingPathComponent("\(id.uuidString).png")
+
+            do {
+                try data.write(to: fileURL, options: .atomic)
+            } catch {
+                print("MacClip: Failed to write image to disk: \(error)")
+                return
+            }
+
+            let title = "Image (\(Int(dimensions.width)) × \(Int(dimensions.height)))"
+            let newItem = ClipboardItem(
+                id: id,
+                itemType: .image,
+                text: title,
+                timestamp: Date(),
+                isPinned: wasPinned,
+                sourceApp: sourceApp,
+                imagePath: fileURL.path,
+                imageWidth: Double(dimensions.width),
+                imageHeight: Double(dimensions.height),
+                imageByteSize: data.count
+            )
+
+            self.objectWillChange.send()
+            self.items.insert(newItem, at: 0)
+            self.pruneExcessItems()
+            self.selectedIndex = 0
+            self.saveHistory()
         }
-
-        let id = UUID()
-        let fileURL = imagesDirectoryURL.appendingPathComponent("\(id.uuidString).png")
-
-        do {
-            try data.write(to: fileURL, options: .atomic)
-        } catch {
-            print("MacClip: Failed to write image to disk: \(error)")
-            return
-        }
-
-        let title = "Image (\(Int(dimensions.width)) × \(Int(dimensions.height)))"
-        let newItem = ClipboardItem(
-            id: id,
-            itemType: .image,
-            text: title,
-            timestamp: Date(),
-            isPinned: false,
-            sourceApp: sourceApp,
-            imagePath: fileURL.path,
-            imageWidth: Double(dimensions.width),
-            imageHeight: Double(dimensions.height),
-            imageByteSize: data.count
-        )
-
-        items.insert(newItem, at: 0)
-        pruneExcessItems()
-        selectedIndex = 0
-        saveHistory()
     }
 
     private func pruneExcessItems() {
@@ -130,40 +151,52 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
 
     public func delete(id: UUID) {
-        if let idx = items.firstIndex(where: { $0.id == id }) {
-            let item = items.remove(at: idx)
-            deleteImageFile(for: item)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if let idx = self.items.firstIndex(where: { $0.id == id }) {
+                let item = self.items.remove(at: idx)
+                self.deleteImageFile(for: item)
+            }
+            if self.selectedIndex >= self.filteredItems.count {
+                self.selectedIndex = max(0, self.filteredItems.count - 1)
+            }
+            self.saveHistory()
         }
-        if selectedIndex >= filteredItems.count {
-            selectedIndex = max(0, filteredItems.count - 1)
-        }
-        saveHistory()
     }
 
     public func togglePin(id: UUID) {
-        if let idx = items.firstIndex(where: { $0.id == id }) {
-            items[idx].isPinned.toggle()
-            saveHistory()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if let idx = self.items.firstIndex(where: { $0.id == id }) {
+                self.items[idx].isPinned.toggle()
+                self.saveHistory()
+            }
         }
     }
 
     public func clearUnpinned() {
-        let unpinned = items.filter { !$0.isPinned }
-        for item in unpinned {
-            deleteImageFile(for: item)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let unpinned = self.items.filter { !$0.isPinned }
+            for item in unpinned {
+                self.deleteImageFile(for: item)
+            }
+            self.items.removeAll { !$0.isPinned }
+            self.selectedIndex = 0
+            self.saveHistory()
         }
-        items.removeAll { !$0.isPinned }
-        selectedIndex = 0
-        saveHistory()
     }
 
     public func clearAll() {
-        for item in items {
-            deleteImageFile(for: item)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            for item in self.items {
+                self.deleteImageFile(for: item)
+            }
+            self.items.removeAll()
+            self.selectedIndex = 0
+            self.saveHistory()
         }
-        items.removeAll()
-        selectedIndex = 0
-        saveHistory()
     }
 
     private func deleteImageFile(for item: ClipboardItem) {

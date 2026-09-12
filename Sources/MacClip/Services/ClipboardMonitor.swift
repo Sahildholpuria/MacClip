@@ -7,8 +7,9 @@ public final class ClipboardMonitor {
     private var lastChangeCount: Int
     private var timer: Timer?
 
-    /// Flag set by PasteManager to prevent capturing its own pasteboard modifications
-    public var isSelfPasting = false
+    /// Prevents capturing self-pasted text/images
+    public var lastSelfPastedText: String?
+    public var lastSelfPastedImageBytes: Int?
 
     private init() {
         self.lastChangeCount = pasteboard.changeCount
@@ -34,15 +35,14 @@ public final class ClipboardMonitor {
         guard currentCount != lastChangeCount else { return }
         lastChangeCount = currentCount
 
-        if isSelfPasting {
-            isSelfPasting = false
-            return
-        }
-
         let sourceApp = NSWorkspace.shared.frontmostApplication?.localizedName
 
-        // 1. Check for Image content FIRST (screenshots, browser copy, finder image files, preview)
+        // 1. Check for Image content FIRST (screenshots, browser copy, finder image files)
         if let (imgData, dimensions) = extractImage(from: pasteboard) {
+            if let lastPasted = lastSelfPastedImageBytes, lastPasted == imgData.count {
+                lastSelfPastedImageBytes = nil
+                return
+            }
             ClipboardHistoryStore.shared.addImage(
                 data: imgData,
                 dimensions: dimensions,
@@ -52,8 +52,15 @@ public final class ClipboardMonitor {
         }
 
         // 2. Check for Text content
-        if let string = pasteboard.string(forType: .string),
-           !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if let string = pasteboard.string(forType: .string) {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+
+            if let lastPasted = lastSelfPastedText, lastPasted == string {
+                lastSelfPastedText = nil
+                return
+            }
+
             ClipboardHistoryStore.shared.addText(text: string, sourceApp: sourceApp)
         }
     }

@@ -53,8 +53,6 @@ public final class PasteManager: ObservableObject {
     }
 
     public func paste(item: ClipboardItem, targetApp: NSRunningApplication? = nil) {
-        ClipboardMonitor.shared.isSelfPasting = true
-
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
@@ -62,6 +60,8 @@ public final class PasteManager: ObservableObject {
            let imgData = try? Data(contentsOf: URL(fileURLWithPath: path)),
            let image = NSImage(data: imgData) {
             
+            ClipboardMonitor.shared.lastSelfPastedImageBytes = imgData.count
+
             let pItem = NSPasteboardItem()
             if let tiff = image.tiffRepresentation {
                 pItem.setData(tiff, forType: .tiff)
@@ -74,23 +74,24 @@ public final class PasteManager: ObservableObject {
             }
             pasteboard.writeObjects([pItem])
         } else {
+            ClipboardMonitor.shared.lastSelfPastedText = item.text
             pasteboard.setString(item.text, forType: .string)
         }
 
-        // Reactivate previous application
+        // Force reactivate the target application before simulating Cmd+V
         if let targetApp = targetApp, targetApp.bundleIdentifier != Bundle.main.bundleIdentifier {
-            targetApp.activate()
+            targetApp.activate(options: [.activateIgnoringOtherApps])
         }
 
-        // Give macOS time to switch window focus before issuing Cmd+V
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+        // Wait a short moment for focus transition, then simulate Cmd+V
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             self.simulatePasteKeystroke()
         }
     }
 
     private func simulatePasteKeystroke() {
         guard AXIsProcessTrusted() else {
-            print("MacClip: Accessibility permission not granted yet. Item copied to clipboard; manual ⌘V paste works.")
+            print("MacClip: Accessibility permission not granted yet. Item is on clipboard for manual ⌘V paste.")
             return
         }
 

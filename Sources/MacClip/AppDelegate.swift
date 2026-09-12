@@ -38,17 +38,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupPanel() {
         let panelRect = NSRect(x: 0, y: 0, width: 430, height: 530)
         let floatingPanel = FloatingPanel(contentRect: panelRect)
-
-        let contentView = ClipboardHistoryView(
-            onSelect: { [weak self] item in
-                self?.paste(item: item)
-            },
-            onClose: { [weak self] in
-                self?.hidePanel()
-            }
-        )
-
-        floatingPanel.contentView = NSHostingView(rootView: contentView)
         self.panel = floatingPanel
     }
 
@@ -73,10 +62,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self.previousApp = frontmost
         }
 
-        // Reset search query and selection on show
+        // Reset search query, selection, and settings on show
         ClipboardHistoryStore.shared.searchText = ""
         ClipboardHistoryStore.shared.selectedIndex = 0
         ClipboardHistoryStore.shared.isSettingsOpen = false
+
+        // Always attach fresh NSHostingView so all items render with up-to-date state
+        let contentView = ClipboardHistoryView(
+            onSelect: { [weak self] item in
+                self?.paste(item: item)
+            },
+            onClose: { [weak self] in
+                self?.hidePanel()
+            }
+        )
+        panel.contentView = NSHostingView(rootView: contentView)
 
         panel.positionNearMouseOrCenter()
         panel.makeKeyAndOrderFront(nil)
