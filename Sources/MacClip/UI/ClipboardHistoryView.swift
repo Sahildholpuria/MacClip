@@ -61,13 +61,13 @@ public struct ClipboardHistoryView: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(
+                .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.35),
-                            Color.white.opacity(0.10),
-                            Color.white.opacity(0.03),
-                            Color.white.opacity(0.18)
+                            Color.white.opacity(0.30),
+                            Color.white.opacity(0.12),
+                            Color.white.opacity(0.04),
+                            Color.white.opacity(0.16)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -75,7 +75,6 @@ public struct ClipboardHistoryView: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: Color.black.opacity(0.28), radius: 24, y: 12)
     }
 
     // MARK: - Glass Separator
@@ -618,7 +617,7 @@ public struct ClipboardHistoryView: View {
     // MARK: - List
     private var listView: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 7) {
                     ForEach(Array(store.filteredItems.enumerated()), id: \.element.id) { index, item in
                         ClipboardItemRow(
@@ -844,17 +843,21 @@ struct ClipboardItemRow: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                            .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
                                     )
 
                                 if let dims = item.formattedDimensions {
                                     Text(dims)
                                         .font(.system(size: 9, weight: .bold, design: .rounded))
                                         .foregroundColor(.white)
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 2)
-                                        .background(Color.black.opacity(0.65))
-                                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2.5)
+                                        .background(Color.black.opacity(0.45))
+                                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.6)
+                                        )
                                         .padding(4)
                                 }
                             }
@@ -958,7 +961,7 @@ struct ClipboardItemRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(
+                .strokeBorder(
                     isSelected
                     ? LinearGradient(
                         colors: [
@@ -1032,8 +1035,14 @@ struct VisualEffectBackground: NSViewRepresentable {
         view.blendingMode = .behindWindow
         view.state = .active
         view.material = .popover
+        view.wantsLayer = true
+        view.layer?.cornerRadius = 22
+        view.layer?.masksToBounds = true
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.layer?.cornerRadius = 22
+        nsView.layer?.masksToBounds = true
+    }
 }

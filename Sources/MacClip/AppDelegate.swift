@@ -80,11 +80,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.hidePanel()
             }
         )
-        panel.contentView = NSHostingView(rootView: contentView)
+        let hostingView = NSHostingView(rootView: contentView)
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.contentView = hostingView
 
         panel.positionNearMouseOrCenter()
         panel.makeKeyAndOrderFront(nil)
+        panel.invalidateShadow()
         panel.startClickOutsideMonitor()
+    }
+
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        togglePanel()
+        return true
     }
 
     public func hidePanel() {
