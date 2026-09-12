@@ -11,6 +11,31 @@ public final class ClipboardHistoryStore: ObservableObject {
             selectedIndex = 0
         }
     }
+    public enum FilterCategory: String, CaseIterable, Identifiable {
+        case all = "All"
+        case pinned = "Pinned"
+        case text = "Text"
+        case images = "Images"
+        case links = "Links"
+
+        public var id: String { rawValue }
+
+        public var iconName: String {
+            switch self {
+            case .all: return "square.stack.3d.up.fill"
+            case .pinned: return "pin.fill"
+            case .text: return "text.alignleft"
+            case .images: return "photo.fill"
+            case .links: return "link"
+            }
+        }
+    }
+
+    @Published public var selectedCategory: FilterCategory = .all {
+        didSet {
+            selectedIndex = 0
+        }
+    }
     @Published public var selectedIndex: Int = 0
     @Published public var hoveredIndex: Int? = nil
     @Published public var isSettingsOpen: Bool = false
@@ -34,12 +59,36 @@ public final class ClipboardHistoryStore: ObservableObject {
         loadHistory()
     }
 
+    public func count(for category: FilterCategory) -> Int {
+        switch category {
+        case .all: return items.count
+        case .pinned: return items.filter { $0.isPinned }.count
+        case .text: return items.filter { $0.itemType == .text && $0.category != .url }.count
+        case .images: return items.filter { $0.itemType == .image }.count
+        case .links: return items.filter { $0.category == .url }.count
+        }
+    }
+
     public var filteredItems: [ClipboardItem] {
+        var base = items
+        switch selectedCategory {
+        case .all:
+            break
+        case .pinned:
+            base = base.filter { $0.isPinned }
+        case .text:
+            base = base.filter { $0.itemType == .text && $0.category != .url }
+        case .images:
+            base = base.filter { $0.itemType == .image }
+        case .links:
+            base = base.filter { $0.category == .url }
+        }
+
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if query.isEmpty {
-            return items
+            return base
         }
-        return items.filter { item in
+        return base.filter { item in
             if item.text.lowercased().contains(query) { return true }
             if let source = item.sourceApp, source.lowercased().contains(query) { return true }
             if item.category.rawValue.lowercased().contains(query) { return true }

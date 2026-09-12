@@ -38,7 +38,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupPanel() {
-        let panelRect = NSRect(x: 0, y: 0, width: 430, height: 530)
+        let panelRect = NSRect(x: 0, y: 0, width: 440, height: 570)
         let floatingPanel = FloatingPanel(contentRect: panelRect)
         self.panel = floatingPanel
     }
