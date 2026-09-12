@@ -1,0 +1,17 @@
+# Xcode & SPM
+.build/
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# User data
+xcuserdata/
