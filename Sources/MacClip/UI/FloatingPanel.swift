@@ -56,7 +56,64 @@ public final class FloatingPanel: NSPanel {
     }
 
     public override func sendEvent(_ event: NSEvent) {
+        if event.type == .flagsChanged && GlobalHotKeyManager.shared.isRecording {
+            let relevantFlags = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            if !relevantFlags.isEmpty {
+                var str = ""
+                if relevantFlags.contains(.control) { str += "⌃" }
+                if relevantFlags.contains(.option) { str += "⌥" }
+                if relevantFlags.contains(.shift) { str += "⇧" }
+                if relevantFlags.contains(.command) { str += "⌘" }
+                GlobalHotKeyManager.shared.recordingPrompt = "\(str) + key..."
+            } else {
+                GlobalHotKeyManager.shared.recordingPrompt = "Press keys..."
+            }
+            return
+        }
+
         if event.type == .keyDown {
+            // Check if user is currently recording a custom shortcut
+            if GlobalHotKeyManager.shared.isRecording {
+                // Cancel recording on Escape
+                if event.keyCode == 53 && event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
+                    GlobalHotKeyManager.shared.stopRecording(cancelled: true)
+                    return
+                }
+
+                let relevantFlags = event.modifierFlags.intersection([.command, .option, .control, .shift])
+                let hasModifier = relevantFlags.contains(.command) || relevantFlags.contains(.option) || relevantFlags.contains(.control)
+
+                // Modifier keys pressed alone (Command, Option, Shift, Control)
+                let modifierKeyCodes: Set<UInt16> = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
+                if modifierKeyCodes.contains(event.keyCode) {
+                    GlobalHotKeyManager.shared.recordingPrompt = "Hold key + letter..."
+                    return
+                }
+
+                if !hasModifier {
+                    GlobalHotKeyManager.shared.recordingPrompt = "Must include ⌘, ⌥, or ⌃"
+                    return
+                }
+
+                let carbonMods = HotkeySetting.carbonModifiers(from: relevantFlags)
+                let keyCode = UInt32(event.keyCode)
+                let displayStr = HotkeySetting.formatDisplayString(flags: relevantFlags, keyCode: event.keyCode)
+                let nameStr = "Custom (\(displayStr))"
+
+                let customSetting = HotkeySetting(
+                    id: "custom_\(keyCode)_\(carbonMods)",
+                    name: nameStr,
+                    keyCode: keyCode,
+                    modifiers: carbonMods,
+                    displayString: displayStr
+                )
+
+                logTrace("Recorded custom shortcut: \(displayStr) (keyCode: \(keyCode), mods: \(carbonMods))")
+                GlobalHotKeyManager.shared.updateHotkey(to: customSetting)
+                GlobalHotKeyManager.shared.stopRecording(cancelled: false)
+                return
+            }
+
             let store = ClipboardHistoryStore.shared
             let count = store.filteredItems.count
 

@@ -187,6 +187,9 @@ public struct ClipboardHistoryView: View {
 
                 // Settings Toggle Icon
                 Button(action: {
+                    if store.isSettingsOpen && hotkeyManager.isRecording {
+                        hotkeyManager.stopRecording(cancelled: true)
+                    }
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                         store.isSettingsOpen.toggle()
                     }
@@ -205,7 +208,12 @@ public struct ClipboardHistoryView: View {
                 .help("Preferences & Shortcuts")
 
                 // Close Button
-                Button(action: { onClose?() }) {
+                Button(action: {
+                    if hotkeyManager.isRecording {
+                        hotkeyManager.stopRecording(cancelled: true)
+                    }
+                    onClose?()
+                }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.secondary)
@@ -339,125 +347,271 @@ public struct ClipboardHistoryView: View {
 
     // MARK: - Settings View
     private var settingsView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Global Activation Shortcut")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundColor(.primary)
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 13) {
+                // Header Title
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Global Activation Shortcut")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
 
-            Text("Press this shortcut anywhere to instantly summon MacClip:")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
+                    Text("Summon MacClip from anywhere in macOS:")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
 
-            VStack(spacing: 6) {
-                ForEach(HotkeySetting.presets, id: \.id) { preset in
-                    let isSelected = hotkeyManager.currentSetting.id == preset.id
-                    Button(action: {
-                        hotkeyManager.updateHotkey(to: preset)
-                    }) {
-                        HStack {
-                            Text(preset.name)
-                                .font(.system(size: 12, weight: isSelected ? .bold : .regular, design: .rounded))
+                // Custom Shortcut Recorder Card
+                let isCustomActive = !HotkeySetting.presets.contains(where: { $0.id == hotkeyManager.currentSetting.id })
+
+                if hotkeyManager.isRecording {
+                    // Recording Active State (Liquid Amber Glass)
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color.orange)
+                                .frame(width: 8, height: 8)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.orange.opacity(0.4), lineWidth: 3)
+                                )
+
+                            Text(hotkeyManager.recordingPrompt)
+                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                .foregroundColor(.orange)
+
                             Spacer()
-                            Text(preset.displayString)
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(isSelected ? Color.accentColor : Color.white.opacity(0.08))
-                                .foregroundColor(isSelected ? .white : .primary)
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
 
-                            if isSelected {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.accentColor)
-                                    .font(.system(size: 14))
-                            } else {
-                                Image(systemName: "circle")
-                                    .foregroundColor(.secondary.opacity(0.3))
-                                    .font(.system(size: 14))
+                            Button(action: {
+                                hotkeyManager.stopRecording(cancelled: true)
+                            }) {
+                                Text("Cancel (Esc)")
+                                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.12))
+                                    .foregroundColor(.primary)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.8))
                             }
+                            .buttonStyle(.plain)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.white.opacity(0.04))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(isSelected ? Color.accentColor.opacity(0.5) : Color.white.opacity(0.08), lineWidth: 0.8)
-                        )
+
+                        Text("Press any modifier (⌘, ⌥, ⌃) + key. Press Esc to cancel.")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .fill(Color.orange.opacity(0.09))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .stroke(Color.orange.opacity(0.45), lineWidth: 1)
+                    )
+                } else {
+                    // Custom Shortcut Card (Liquid Glass)
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Image(systemName: isCustomActive ? "keyboard.fill" : "keyboard")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(isCustomActive ? .accentColor : .secondary)
+
+                                Text("Custom Shortcut")
+                                    .font(.system(size: 12, weight: isCustomActive ? .bold : .medium, design: .rounded))
+
+                                if isCustomActive {
+                                    Text("ACTIVE")
+                                        .font(.system(size: 8.5, weight: .heavy, design: .rounded))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1.5)
+                                        .background(Color.accentColor)
+                                        .clipShape(Capsule())
+                                }
+                            }
+
+                            Text(isCustomActive ? hotkeyManager.currentSetting.name : "Record your own combination (e.g. ⌘⇧C, ⌃⌥Space)")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        if isCustomActive {
+                            Text(hotkeyManager.currentSetting.displayString)
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3.5)
+                                .background(Color.accentColor.opacity(0.18))
+                                .foregroundColor(.accentColor)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .stroke(Color.accentColor.opacity(0.4), lineWidth: 0.8)
+                                )
+                        }
+
+                        Button(action: {
+                            hotkeyManager.startRecording()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: isCustomActive ? "arrow.triangle.2.circlepath" : "record.circle")
+                                    .font(.system(size: 10.5, weight: .bold))
+                                Text(isCustomActive ? "Change" : "Record")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundColor(.primary)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .help("Record a custom global shortcut")
+                    }
+                    .padding(11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .fill(isCustomActive ? Color.accentColor.opacity(0.10) : Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .stroke(isCustomActive ? Color.accentColor.opacity(0.35) : Color.white.opacity(0.08), lineWidth: 0.8)
+                    )
+                }
+
+                // Standard Presets Section
+                Text("Or select a standard preset:")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+
+                VStack(spacing: 5) {
+                    ForEach(HotkeySetting.presets, id: \.id) { preset in
+                        let isSelected = hotkeyManager.currentSetting.id == preset.id
+                        Button(action: {
+                            if hotkeyManager.isRecording {
+                                hotkeyManager.stopRecording(cancelled: true)
+                            }
+                            hotkeyManager.updateHotkey(to: preset)
+                        }) {
+                            HStack {
+                                Text(preset.name)
+                                    .font(.system(size: 11.5, weight: isSelected ? .bold : .regular, design: .rounded))
+                                Spacer()
+                                Text(preset.displayString)
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2.5)
+                                    .background(isSelected ? Color.accentColor : Color.white.opacity(0.07))
+                                    .foregroundColor(isSelected ? .white : .primary)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+
+                                if isSelected {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.accentColor)
+                                        .font(.system(size: 13))
+                                } else {
+                                    Image(systemName: "circle")
+                                        .foregroundColor(.secondary.opacity(0.3))
+                                        .font(.system(size: 13))
+                                }
+                            }
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 7)
+                            .background(
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.white.opacity(0.03))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .stroke(isSelected ? Color.accentColor.opacity(0.45) : Color.white.opacity(0.06), lineWidth: 0.8)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Divider().opacity(0.15)
+                    .padding(.vertical, 2)
+
+                // Accessibility Permission Card
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Auto-Paste Permission")
+                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        Text(pasteManager.isAccessibilityGranted ? "Granted — Keystrokes auto-paste into active apps" : "Click to authorize in macOS System Settings")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+
+                    if pasteManager.isAccessibilityGranted {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                            Text("Active")
+                                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                                .foregroundColor(.green)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3.5)
+                        .background(Color.green.opacity(0.12))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.green.opacity(0.25), lineWidth: 0.6))
+                    } else {
+                        Button("Open Settings") {
+                            pasteManager.requestAccessibility()
+                        }
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                )
+
+                // Done Button
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        if hotkeyManager.isRecording {
+                            hotkeyManager.stopRecording(cancelled: true)
+                        }
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            store.isSettingsOpen = false
+                        }
+                    }) {
+                        Text("Done")
+                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .background(Color.accentColor)
+                            .foregroundColor(.white)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.8))
                     }
                     .buttonStyle(.plain)
                 }
+                .padding(.top, 4)
             }
-
-            Divider().opacity(0.2)
-
-            // Accessibility Card
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Auto-Paste Permission")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                    Text(pasteManager.isAccessibilityGranted ? "Granted — Keystrokes auto-paste into active apps" : "Click to authorize in macOS System Settings")
-                        .font(.system(size: 10.5))
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-
-                if pasteManager.isAccessibilityGranted {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 7, height: 7)
-                        Text("Active")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundColor(.green)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.12))
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(Color.green.opacity(0.25), lineWidth: 0.6))
-                } else {
-                    Button("Open Settings") {
-                        pasteManager.requestAccessibility()
-                    }
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(0.04))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
-            )
-
-            Spacer()
-
-            HStack {
-                Spacer()
-                Button("Done") {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                        store.isSettingsOpen = false
-                    }
-                }
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background(Color.accentColor)
-                .foregroundColor(.white)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.8))
-                .buttonStyle(.plain)
-            }
+            .padding(14)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 

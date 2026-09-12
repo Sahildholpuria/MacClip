@@ -8,13 +8,9 @@ Built with **Swift**, **SwiftUI**, and **AppKit** for Apple Silicon and macOS 13
 
 ## ✨ Features
 
-- **Customizable Global Hotkey**: Summon your clipboard history overlay anytime with your preferred shortcut:
-  - `⌥ + V` (Option + V) — *Default*
-  - `⌘ + Shift + V` (Command + Shift + V)
-  - `⌥ + ⌘ + V` (Option + Command + V)
-  - `⌃ + V` (Control + V)
-  - `⌥ + Space` (Option + Space)
-  *(Change via the ⚙️ Settings gear in the app or directly from the Menu Bar menu)*.
+- **Customizable Global Hotkey ⌨️**: Record and set **any custom key combination** you prefer (e.g. `⌘⇧C`, `⌃⌥Space`, `⌥⌘V`, `⌘⇧V`, etc.) with interactive live key capture, or choose from popular presets (`⌥V`, `⌘⇧V`, `⌥⌘V`, `⌃V`, `⌥Space`).
+  *(Change via the ⚙️ Settings slider in the app or directly from the Menu Bar menu)*.
+- **Apple Liquid Glass UI 🪟**: Translucent glass materials, specular border highlights, smooth spring animations, and amber alert glass banners.
 - **Image & Screenshot Support 🖼️**: Automatically records copied images and screenshots (PNG/TIFF) with high-res thumbnail previews, resolution indicators, and file sizes. Selecting an image pastes it directly into supported apps.
 - **Direct Auto-Paste**: Selecting a snippet or image immediately pastes it into your previous active app (Safari, VS Code, Slack, Notes, Discord, etc.).
 - **Quick Paste (`⌘1` – `⌘9`)**: Press Command + Number to instantly paste any of the top 9 recent items.

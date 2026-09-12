@@ -48,6 +48,13 @@ public final class MenuBarController {
 
         // Shortcut submenu
         let shortcutMenu = NSMenu()
+        let isPreset = HotkeySetting.presets.contains(where: { $0.id == hotkey.id })
+        if !isPreset {
+            let customItem = NSMenuItem(title: "\(hotkey.name) (\(hotkey.displayString))", action: nil, keyEquivalent: "")
+            customItem.state = .on
+            shortcutMenu.addItem(customItem)
+            shortcutMenu.addItem(NSMenuItem.separator())
+        }
         for preset in HotkeySetting.presets {
             let item = NSMenuItem(title: "\(preset.name) (\(preset.displayString))", action: #selector(changeShortcutPreset(_:)), keyEquivalent: "")
             item.target = self
@@ -57,6 +64,10 @@ public final class MenuBarController {
             }
             shortcutMenu.addItem(item)
         }
+        shortcutMenu.addItem(NSMenuItem.separator())
+        let recordItem = NSMenuItem(title: "Record Custom Shortcut…", action: #selector(openPreferences), keyEquivalent: "")
+        recordItem.target = self
+        shortcutMenu.addItem(recordItem)
 
         let shortcutItem = NSMenuItem(title: "Shortcut", action: nil, keyEquivalent: "")
         shortcutItem.submenu = shortcutMenu
@@ -100,6 +111,10 @@ public final class MenuBarController {
 
     @objc private func openClipboard() {
         AppDelegate.shared?.showPanel()
+    }
+
+    @objc private func openPreferences() {
+        AppDelegate.shared?.showPanel(showSettings: true)
     }
 
     @objc private func requestAccessibility() {

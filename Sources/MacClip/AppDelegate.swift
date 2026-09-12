@@ -52,7 +52,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    public func showPanel() {
+    public func showPanel(showSettings: Bool = false) {
         guard let panel = panel else { return }
 
         // Capture frontmost application before showing the panel
@@ -69,7 +69,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardHistoryStore.shared.searchText = ""
         ClipboardHistoryStore.shared.selectedIndex = 0
         ClipboardHistoryStore.shared.hoveredIndex = nil
-        ClipboardHistoryStore.shared.isSettingsOpen = false
+        ClipboardHistoryStore.shared.isSettingsOpen = showSettings
 
         // Attach fresh NSHostingView so all items render with up-to-date state
         let contentView = ClipboardHistoryView(
@@ -88,6 +88,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func hidePanel() {
+        GlobalHotKeyManager.shared.stopRecording(cancelled: true)
         panel?.stopClickOutsideMonitor()
         panel?.orderOut(nil)
     }

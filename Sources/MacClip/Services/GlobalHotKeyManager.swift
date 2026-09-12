@@ -8,6 +8,8 @@ public final class GlobalHotKeyManager: ObservableObject {
     public var onHotKeyPressed: (() -> Void)?
 
     @Published public var currentSetting: HotkeySetting
+    @Published public var isRecording: Bool = false
+    @Published public var recordingPrompt: String = "Press keys..."
 
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
@@ -21,6 +23,18 @@ public final class GlobalHotKeyManager: ObservableObject {
         } else {
             self.currentSetting = .optionV
         }
+    }
+
+    public func startRecording() {
+        isRecording = true
+        recordingPrompt = "Press keys..."
+        unregister()
+    }
+
+    public func stopRecording(cancelled: Bool = false) {
+        isRecording = false
+        recordingPrompt = "Press keys..."
+        register()
     }
 
     public func register() {
