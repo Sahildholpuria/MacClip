@@ -38,12 +38,10 @@ public final class PasteManager: ObservableObject {
         let options = [promptKey: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
 
-        // Open macOS System Settings directly to Privacy & Security -> Accessibility
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
 
-        // Recheck status after brief delays
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             self?.checkAccessibility()
         }
@@ -52,11 +50,11 @@ public final class PasteManager: ObservableObject {
         }
     }
 
-    public func paste(item: ClipboardItem, targetApp: NSRunningApplication? = nil) {
+    public func paste(item: ClipboardItem) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
-        // 1. Write multi-flavor data to pasteboard
+        // 1. Write item to pasteboard in all supported formats
         if item.itemType == .image, let path = item.imagePath,
            let imgData = try? Data(contentsOf: URL(fileURLWithPath: path)),
            let image = NSImage(data: imgData) {
@@ -81,62 +79,34 @@ public final class PasteManager: ObservableObject {
             pasteboard.setString(item.text, forType: .string)
         }
 
-        // 2. Hide MacClip panel and hide MacClip app to yield focus back to target app
-        AppDelegate.shared?.hidePanel()
-        NSApp.hide(nil)
-
-        // 3. Explicitly reactivate the target application
-        let appToActivate = targetApp ?? NSWorkspace.shared.runningApplications.first {
-            $0.activationPolicy == .regular && $0.bundleIdentifier != Bundle.main.bundleIdentifier
-        }
-
-        if let app = appToActivate {
-            app.activate(options: [.activateIgnoringOtherApps])
-        }
-
-        // 4. Delay 200ms for window focus transition, then simulate Cmd+V
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) { [weak self] in
-            self?.simulatePasteKeystroke(targetApp: appToActivate)
-        }
+        // 2. Perform paste simulation
+        performPaste()
     }
 
-    private func simulatePasteKeystroke(targetApp: NSRunningApplication? = nil) {
-        let trusted = AXIsProcessTrusted()
-
-        // 1. Simulate Cmd+V keystroke via CGEvent
-        let source = CGEventSource(stateID: .hidSystemState)
-        let vKeyCode = CGKeyCode(kVK_ANSI_V) // 9
-
-        if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true),
-           let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) {
+    private func performPaste() {
+        // Delay slightly for panel orderOut to restore key focus to the active application
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            // Method 1: Standard macOS CGEvent paste command via annotated session tap
+            let eventSource = CGEventSource(stateID: .combinedSessionState)
             
-            keyDown.flags = .maskCommand
-            keyUp.flags = .maskCommand
+            if let eventDown = CGEvent(keyboardEventSource: eventSource, virtualKey: 9, keyDown: true),
+               let eventUp = CGEvent(keyboardEventSource: eventSource, virtualKey: 9, keyDown: false) {
+                
+                eventDown.flags = .maskCommand
+                eventUp.flags = .maskCommand
 
-            // Post directly to target PID if available
-            if let pid = targetApp?.processIdentifier {
-                keyDown.postToPid(pid)
+                eventDown.post(tap: .cgAnnotatedSessionEventTap)
+                eventUp.post(tap: .cgAnnotatedSessionEventTap)
             }
 
-            // Post to session and HID taps
-            keyDown.post(tap: .cgAnnotatedSessionEventTap)
-            keyDown.post(tap: .cghidEventTap)
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
-                if let pid = targetApp?.processIdentifier {
-                    keyUp.postToPid(pid)
+            // Method 2: Also run AppleScript System Events if accessibility is in transition
+            if !AXIsProcessTrusted() {
+                let scriptSource = "tell application \"System Events\" to keystroke \"v\" using command down"
+                if let script = NSAppleScript(source: scriptSource) {
+                    var error: NSDictionary?
+                    script.executeAndReturnError(&error)
                 }
-                keyUp.post(tap: .cgAnnotatedSessionEventTap)
-                keyUp.post(tap: .cghidEventTap)
             }
-        }
-
-        // 2. If accessibility is not granted, notify user so they know item is on clipboard
-        if !trusted {
-            let notification = NSUserNotification()
-            notification.title = "MacClip"
-            notification.informativeText = "Copied to clipboard! Press ⌘V to paste."
-            NSUserNotificationCenter.default.deliver(notification)
         }
     }
 }

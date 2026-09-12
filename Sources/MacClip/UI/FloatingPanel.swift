@@ -31,8 +31,7 @@ public final class FloatingPanel: NSPanel {
     }
 
     @objc private func panelDidResignKey() {
-        // Small delay so if user clicked an action inside or activated paste, it processes first
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let self = self, self.isVisible else { return }
             self.orderOut(nil)
         }
@@ -43,7 +42,7 @@ public final class FloatingPanel: NSPanel {
     }
 
     public override var canBecomeMain: Bool {
-        return true
+        return false // Never take main app status away from active app
     }
 
     public override func cancelOperation(_ sender: Any?) {

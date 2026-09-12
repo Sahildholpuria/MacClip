@@ -6,7 +6,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var panel: FloatingPanel?
     private var menuBarController: MenuBarController?
-    public private(set) var previousApp: NSRunningApplication?
 
     public override init() {
         super.init()
@@ -56,16 +55,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Recheck accessibility permission on show
         PasteManager.shared.checkAccessibility()
 
-        // Save active application to restore focus later for auto-pasting
-        let frontmost = NSWorkspace.shared.frontmostApplication
-        if let frontmost = frontmost, frontmost.bundleIdentifier != Bundle.main.bundleIdentifier {
-            self.previousApp = frontmost
-        } else if self.previousApp == nil || self.previousApp?.isTerminated == true {
-            self.previousApp = NSWorkspace.shared.runningApplications.first {
-                $0.activationPolicy == .regular && $0.bundleIdentifier != Bundle.main.bundleIdentifier
-            }
-        }
-
         // Reset search query, selection, and settings on show
         ClipboardHistoryStore.shared.searchText = ""
         ClipboardHistoryStore.shared.selectedIndex = 0
@@ -84,7 +73,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.positionNearMouseOrCenter()
         panel.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        // Kept non-activating so the active app's text cursor remains focused
     }
 
     public func hidePanel() {
@@ -92,8 +81,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func paste(item: ClipboardItem) {
-        let target = self.previousApp
-        PasteManager.shared.paste(item: item, targetApp: target)
+        hidePanel()
+        PasteManager.shared.paste(item: item)
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
