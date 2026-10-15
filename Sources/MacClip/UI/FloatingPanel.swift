@@ -3,6 +3,12 @@ import SwiftUI
 
 public final class FloatingPanel: NSPanel {
     private var clickOutsideMonitor: Any?
+    private var dragStartMouseLocation: NSPoint = .zero
+    private var dragStartWindowOrigin: NSPoint = .zero
+    private var isDraggingWindow: Bool = false
+    private var canInitiateDrag: Bool = false
+    private var dragDistanceThreshold: CGFloat = 2.0
+    public var hasUserMovedWindow: Bool = false
 
     public init(contentRect: NSRect) {
         super.init(
@@ -54,6 +60,62 @@ public final class FloatingPanel: NSPanel {
     }
 
     public override func sendEvent(_ event: NSEvent) {
+        // MARK: - Window Dragging Handling
+        if event.type == .leftMouseDown {
+            let loc = event.locationInWindow
+            let hit = self.contentView?.hitTest(loc)
+            let isTextOrSlider = (hit is NSTextView) || (hit is NSTextField) || (hit is NSSlider)
+
+            // Dedicated top grab handle (top 22pt)
+            let isGrabHandle = loc.y >= (self.frame.height - 22)
+
+            // Check if click is inside search input field in default clips view
+            let store = ClipboardHistoryStore.shared
+            let isInsideSearchField = (!store.isSettingsOpen && store.previewItem == nil) &&
+                (loc.y >= (self.frame.height - 58) && loc.y <= (self.frame.height - 22) && loc.x >= 14 && loc.x <= 400)
+
+            if !isTextOrSlider && !isInsideSearchField {
+                dragStartMouseLocation = NSEvent.mouseLocation
+                dragStartWindowOrigin = self.frame.origin
+                isDraggingWindow = false
+                canInitiateDrag = true
+
+                if isGrabHandle {
+                    dragDistanceThreshold = 1.0
+                } else {
+                    let isFooter = loc.y <= 42
+                    let isSideBorder = loc.x <= 14 || loc.x >= (self.frame.width - 14)
+                    if isFooter || isSideBorder {
+                        dragDistanceThreshold = 3.0
+                    } else {
+                        dragDistanceThreshold = 8.0
+                    }
+                }
+            } else {
+                canInitiateDrag = false
+            }
+        } else if event.type == .leftMouseDragged && canInitiateDrag {
+            let currentMouse = NSEvent.mouseLocation
+            let deltaX = currentMouse.x - dragStartMouseLocation.x
+            let deltaY = currentMouse.y - dragStartMouseLocation.y
+
+            if isDraggingWindow || abs(deltaX) > dragDistanceThreshold || abs(deltaY) > dragDistanceThreshold {
+                isDraggingWindow = true
+                hasUserMovedWindow = true
+                self.setFrameOrigin(NSPoint(
+                    x: dragStartWindowOrigin.x + deltaX,
+                    y: dragStartWindowOrigin.y + deltaY
+                ))
+                return // Consume drag event so subviews do not process mouse movement
+            }
+        } else if event.type == .leftMouseUp {
+            let wasDragging = isDraggingWindow
+            isDraggingWindow = false
+            canInitiateDrag = false
+            if wasDragging {
+                return // Consume mouse up so dropping the window does not trigger a click on child views
+            }
+        }
         if event.type == .flagsChanged && GlobalHotKeyManager.shared.isRecording {
             let relevantFlags = event.modifierFlags.intersection([.command, .option, .control, .shift])
             if !relevantFlags.isEmpty {
@@ -226,6 +288,15 @@ public final class FloatingPanel: NSPanel {
     }
 
     public func positionNearMouseOrCenter() {
+        if hasUserMovedWindow {
+            // Keep window where user placed it, as long as it is visible on a connected screen
+            let currentOrigin = self.frame.origin
+            let currentCenter = NSPoint(x: currentOrigin.x + self.frame.width / 2, y: currentOrigin.y + self.frame.height / 2)
+            if NSScreen.screens.contains(where: { NSMouseInRect(currentCenter, $0.frame, false) }) {
+                return
+            }
+        }
+
         let mouseLocation = NSEvent.mouseLocation
         let screens = NSScreen.screens
         let currentScreen = screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
