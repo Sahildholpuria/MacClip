@@ -51,7 +51,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.hidePanel()
             }
         )
-        let hostingView = NSHostingView(rootView: contentView)
+        let hostingView = DraggableHostingView(rootView: contentView)
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
         floatingPanel.contentView = hostingView
@@ -125,3 +125,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardMonitor.shared.stopMonitoring()
     }
 }
+
+// MARK: - Draggable NSHostingView
+final class DraggableHostingView<Content: View>: NSHostingView<Content> {
+    override var mouseDownCanMoveWindow: Bool {
+        return true
+    }
+}
+

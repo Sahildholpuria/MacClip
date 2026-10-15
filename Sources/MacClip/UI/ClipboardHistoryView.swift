@@ -19,11 +19,25 @@ public struct ClipboardHistoryView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
+            // Top Window Drag Grab Handle (Apple HIG standard)
+            HStack {
+                Spacer()
+                Capsule()
+                    .fill(Color.white.opacity(0.32))
+                    .frame(width: 42, height: 4.5)
+                Spacer()
+            }
+            .frame(height: 14)
+            .contentShape(Rectangle())
+            .background(WindowDragArea())
+            .help("Drag to move window anywhere on screen")
+
             // Glass Header: Search & Glass Action Buttons
             headerView
                 .padding(.horizontal, 14)
-                .padding(.top, 14)
+                .padding(.top, 4)
                 .padding(.bottom, 8)
+                .background(WindowDragArea())
 
             // Category Filter Pills (All, Pinned, Text, Images, Links)
             if !store.isSettingsOpen && store.previewItem == nil {
@@ -60,6 +74,7 @@ public struct ClipboardHistoryView: View {
             footerView
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+                .background(WindowDragArea())
         }
         .frame(width: 456, height: 575)
         .background(
@@ -2116,10 +2131,27 @@ struct ClipboardItemRow: View {
     }
 }
 
+// MARK: - Window Drag Area (Native AppKit Drag Support)
+struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> DragView {
+        DragView()
+    }
+
+    func updateNSView(_ nsView: DragView, context: Context) {}
+
+    final class DragView: NSView {
+        override var mouseDownCanMoveWindow: Bool { true }
+
+        override func mouseDown(with event: NSEvent) {
+            window?.performDrag(with: event)
+        }
+    }
+}
+
 // MARK: - Frosted Liquid Glass Background
 struct VisualEffectBackground: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
+    func makeNSView(context: Context) -> DraggableVisualEffectView {
+        let view = DraggableVisualEffectView()
         view.blendingMode = .behindWindow
         view.state = .active
         view.material = .popover
@@ -2129,9 +2161,17 @@ struct VisualEffectBackground: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+    func updateNSView(_ nsView: DraggableVisualEffectView, context: Context) {
         nsView.layer?.cornerRadius = 22
         nsView.layer?.masksToBounds = true
+    }
+}
+
+final class DraggableVisualEffectView: NSVisualEffectView {
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
     }
 }
 
