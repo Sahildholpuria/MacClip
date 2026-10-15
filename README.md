@@ -52,13 +52,38 @@ Built with **Swift**, **SwiftUI**, and **AppKit** for Apple Silicon and macOS 13
 <img width="444" height="575" alt="image" src="https://github.com/user-attachments/assets/e60e1654-0f84-4a99-b203-81dcc4710cac" />
 
 
+## 📦 Installation & macOS Security (Gatekeeper)
+
+### 1. Download & Install
+Download the latest [**`MacClip-Universal.dmg`**](https://github.com/Sahildholpuria/MacClip/releases/latest) from the Releases page, open the DMG, and drag **MacClip** to your **Applications** folder.
+
+### 2. Opening for the First Time (Apple Gatekeeper)
+Because MacClip is an open-source project distributed outside the Mac App Store without a paid Apple Developer ID certificate, macOS Gatekeeper shows a warning: *"Apple could not verify MacClip is free of malware"*.
+
+You can easily allow it using either method:
+
+- **Method A (System Settings)**:
+  1. Open **System Settings** > **Privacy & Security**.
+  2. Scroll down to the **Security** section.
+  3. You will see: *"MacClip was blocked from use because it is not from an identified developer"*.
+  4. Click **"Open Anyway"** and enter your password.
+
+- **Method B (Quick Terminal 1-liner)**:
+  Run this command in Terminal to clear the quarantine flag:
+  ```bash
+  xattr -cr /Applications/MacClip.app
+  ```
+  *(Or if opening the DMG directly: `xattr -cr ~/Downloads/MacClip-Universal*.dmg`)*
+
+---
+
 ## 🚀 How to Launch
 
-The app is already compiled and installed in your `~/Applications` folder.
+The app is located in your `/Applications` folder.
 
 ### Launch via Terminal:
 ```bash
-open ~/Applications/MacClip.app
+open /Applications/MacClip.app
 ```
 
 Or open **Finder > Applications** (or Spotlight `⌘ Space`), search for **MacClip**, and press Enter.
