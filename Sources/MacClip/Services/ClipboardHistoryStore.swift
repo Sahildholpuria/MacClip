@@ -419,9 +419,13 @@ public final class ClipboardHistoryStore: ObservableObject {
     public func delete(id: UUID) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            if self.previewItem?.id == id {
+                self.previewItem = nil
+            }
             if let idx = self.items.firstIndex(where: { $0.id == id }) {
                 let item = self.items.remove(at: idx)
                 self.deleteImageFile(for: item)
+                NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
             }
             if self.selectedIndex >= self.filteredItems.count {
                 self.selectedIndex = max(0, self.filteredItems.count - 1)
@@ -436,6 +440,10 @@ public final class ClipboardHistoryStore: ObservableObject {
             guard let self = self else { return }
             if let idx = self.items.firstIndex(where: { $0.id == id }) {
                 self.items[idx].isPinned.toggle()
+                if self.previewItem?.id == id {
+                    self.previewItem?.isPinned = self.items[idx].isPinned
+                }
+                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
                 self.saveHistory()
                 self.updateStorageStats()
             }
@@ -445,12 +453,16 @@ public final class ClipboardHistoryStore: ObservableObject {
     public func clearUnpinned() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            if let preview = self.previewItem, !preview.isPinned {
+                self.previewItem = nil
+            }
             let unpinned = self.items.filter { !$0.isPinned }
             for item in unpinned {
                 self.deleteImageFile(for: item)
             }
             self.items.removeAll { !$0.isPinned }
             self.selectedIndex = 0
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
             self.saveHistory()
             self.updateStorageStats()
         }
@@ -459,11 +471,14 @@ public final class ClipboardHistoryStore: ObservableObject {
     public func clearAll() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            self.previewItem = nil
+            ImageCache.shared.clear()
             for item in self.items {
                 self.deleteImageFile(for: item)
             }
             self.items.removeAll()
             self.selectedIndex = 0
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
             self.saveHistory()
             self.updateStorageStats()
         }
@@ -471,15 +486,18 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     private func deleteImageFile(for item: ClipboardItem) {
         if item.itemType == .image, let path = item.imagePath {
+            ImageCache.shared.removeImage(for: path)
             try? FileManager.default.removeItem(atPath: path)
         }
     }
 
     private func saveHistory() {
+        // Snapshot items on caller thread to prevent concurrent mutation race during encoding
+        let itemsSnapshot = self.items
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
             do {
-                let data = try JSONEncoder().encode(self.items)
+                let data = try JSONEncoder().encode(itemsSnapshot)
                 try data.write(to: self.storageURL, options: .atomic)
             } catch {
                 print("Error saving history: \(error)")

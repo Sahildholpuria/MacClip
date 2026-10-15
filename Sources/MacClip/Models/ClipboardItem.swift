@@ -17,6 +17,7 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
     public var imageWidth: Double?
     public var imageHeight: Double?
     public var imageByteSize: Int?
+    public let category: ContentCategory
 
     public init(
         id: UUID = UUID(),
@@ -28,7 +29,8 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
         imagePath: String? = nil,
         imageWidth: Double? = nil,
         imageHeight: Double? = nil,
-        imageByteSize: Int? = nil
+        imageByteSize: Int? = nil,
+        category: ContentCategory? = nil
     ) {
         self.id = id
         self.itemType = itemType
@@ -40,14 +42,17 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
         self.imageWidth = imageWidth
         self.imageHeight = imageHeight
         self.imageByteSize = imageByteSize
+        self.category = category ?? ClipboardItem.detectCategory(itemType: itemType, text: text)
     }
 
     // Custom decoder for backwards-compatibility
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
-        self.itemType = (try? container.decode(ItemType.self, forKey: .itemType)) ?? .text
-        self.text = try container.decode(String.self, forKey: .text)
+        let decodedType = (try? container.decode(ItemType.self, forKey: .itemType)) ?? .text
+        self.itemType = decodedType
+        let decodedText = try container.decode(String.self, forKey: .text)
+        self.text = decodedText
         self.timestamp = try container.decode(Date.self, forKey: .timestamp)
         self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
         self.sourceApp = try? container.decode(String.self, forKey: .sourceApp)
@@ -55,6 +60,11 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
         self.imageWidth = try? container.decode(Double.self, forKey: .imageWidth)
         self.imageHeight = try? container.decode(Double.self, forKey: .imageHeight)
         self.imageByteSize = try? container.decode(Int.self, forKey: .imageByteSize)
+        if let cat = try? container.decode(ContentCategory.self, forKey: .category) {
+            self.category = cat
+        } else {
+            self.category = ClipboardItem.detectCategory(itemType: decodedType, text: decodedText)
+        }
     }
 
     public enum ContentCategory: String, Codable {
@@ -77,7 +87,7 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
         }
     }
 
-    public var category: ContentCategory {
+    public static func detectCategory(itemType: ItemType, text: String) -> ContentCategory {
         if itemType == .image {
             return .image
         }
@@ -86,8 +96,8 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
         if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
             return .url
         }
-        if trimmed.count <= 9 && (trimmed.hasPrefix("#") || trimmed.hasPrefix("0x")) {
-            let hexRegex = "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+        if trimmed.count <= 10 && (trimmed.hasPrefix("#") || trimmed.hasPrefix("0x") || trimmed.hasPrefix("0X")) {
+            let hexRegex = "^(?:#|0x|0X)(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
             if trimmed.range(of: hexRegex, options: .regularExpression) != nil {
                 return .color
             }
@@ -145,6 +155,61 @@ public struct ClipboardItem: Identifiable, Codable, Equatable {
         if hours < 24 { return "\(hours)h ago" }
         let days = hours / 24
         return "\(days)d ago"
+    }
+
+    // MARK: - Color Formatting Conversions
+    public var rgbColorString: String? {
+        guard category == .color, let (r, g, b) = parseRGB() else { return nil }
+        return "rgb(\(r), \(g), \(b))"
+    }
+
+    public var hslColorString: String? {
+        guard category == .color, let (r, g, b) = parseRGB() else { return nil }
+        let rf = Double(r) / 255.0
+        let gf = Double(g) / 255.0
+        let bf = Double(b) / 255.0
+        let cMax = max(rf, gf, bf)
+        let cMin = min(rf, gf, bf)
+        let delta = cMax - cMin
+        let l = (cMax + cMin) / 2.0
+
+        var h: Double = 0
+        var s: Double = 0
+
+        if delta != 0 {
+            s = l > 0.5 ? delta / (2.0 - cMax - cMin) : delta / (cMax + cMin)
+            if cMax == rf {
+                h = ((gf - bf) / delta).truncatingRemainder(dividingBy: 6.0)
+            } else if cMax == gf {
+                h = ((bf - rf) / delta) + 2.0
+            } else {
+                h = ((rf - gf) / delta) + 4.0
+            }
+            h *= 60.0
+            if h < 0 { h += 360.0 }
+        }
+
+        return "hsl(\(Int(round(h))), \(Int(round(s * 100)))%, \(Int(round(l * 100)))%)"
+    }
+
+    private func parseRGB() -> (r: Int, g: Int, b: Int)? {
+        var hex = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hex.hasPrefix("#") { hex.removeFirst() }
+        else if hex.lowercased().hasPrefix("0x") { hex.removeFirst(2) }
+
+        var intVal: UInt64 = 0
+        guard Scanner(string: hex).scanHexInt64(&intVal) else { return nil }
+
+        switch hex.count {
+        case 3: // 12-bit
+            return (Int((intVal >> 8) * 17), Int((intVal >> 4 & 0xF) * 17), Int((intVal & 0xF) * 17))
+        case 6: // 24-bit
+            return (Int(intVal >> 16), Int(intVal >> 8 & 0xFF), Int(intVal & 0xFF))
+        case 8: // 32-bit ARGB
+            return (Int(intVal >> 16 & 0xFF), Int(intVal >> 8 & 0xFF), Int(intVal & 0xFF))
+        default:
+            return nil
+        }
     }
 
     public static func == (lhs: ClipboardItem, rhs: ClipboardItem) -> Bool {

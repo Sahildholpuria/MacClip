@@ -133,6 +133,10 @@ public final class FloatingPanel: NSPanel {
                     store.previewItem = nil
                     return
                 }
+                if !store.searchText.isEmpty {
+                    store.searchText = ""
+                    return
+                }
                 AppDelegate.shared?.hidePanel()
                 return
 
@@ -179,6 +183,38 @@ public final class FloatingPanel: NSPanel {
                 if event.modifierFlags.contains(.command) && !store.isSettingsOpen && count > 0 && store.selectedIndex < count {
                     let currentItem = store.filteredItems[store.selectedIndex]
                     store.togglePreview(for: currentItem)
+                    return
+                }
+
+            case 35: // Cmd + P (Toggle Pin)
+                if event.modifierFlags.contains(.command) && !store.isSettingsOpen && count > 0 && store.selectedIndex < count {
+                    let currentItem = store.filteredItems[store.selectedIndex]
+                    store.togglePin(id: currentItem.id)
+                    return
+                }
+
+            case 51, 117: // Backspace or Forward Delete (Cmd+Delete or outside text editor)
+                let isEditingField = (self.firstResponder as? NSTextView)?.isFieldEditor == true
+                if (event.modifierFlags.contains(.command) || !isEditingField) && !store.isSettingsOpen && count > 0 && store.selectedIndex < count {
+                    let currentItem = store.filteredItems[store.selectedIndex]
+                    store.delete(id: currentItem.id)
+                    return
+                }
+
+            case 8: // Cmd + C (Copy selected item)
+                let textView = self.firstResponder as? NSTextView
+                let hasTextSelection = (textView?.selectedRange().length ?? 0) > 0
+                if event.modifierFlags.contains(.command) && !hasTextSelection && !store.isSettingsOpen && count > 0 && store.selectedIndex < count {
+                    let item = store.filteredItems[store.selectedIndex]
+                    let pb = NSPasteboard.general
+                    pb.clearContents()
+                    if item.itemType == .image, let path = item.imagePath,
+                       let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                        pb.setData(data, forType: NSPasteboard.PasteboardType("public.png"))
+                    } else {
+                        pb.setString(item.text, forType: .string)
+                    }
+                    NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
                     return
                 }
 

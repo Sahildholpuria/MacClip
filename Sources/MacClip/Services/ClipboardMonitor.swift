@@ -137,9 +137,13 @@ public final class ClipboardMonitor {
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
             let imageExtensions = ["png", "jpg", "jpeg", "webp", "gif", "tiff", "tif", "heic", "svg", "bmp", "ico"]
             for url in urls {
-                if imageExtensions.contains(url.pathExtension.lowercased()),
-                   let img = NSImage(contentsOf: url), img.isValid {
-                    if let data = try? Data(contentsOf: url) {
+                if imageExtensions.contains(url.pathExtension.lowercased()) {
+                    if let attr = try? FileManager.default.attributesOfItem(atPath: url.path),
+                       let size = attr[.size] as? Int64, size > 25 * 1024 * 1024 {
+                        continue // skip images larger than 25MB to prevent memory/UI freezes
+                    }
+                    if let img = NSImage(contentsOf: url), img.isValid,
+                       let data = try? Data(contentsOf: url) {
                         return (data, img.size)
                     }
                 }

@@ -37,14 +37,34 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         print("MacClip successfully launched.")
     }
 
+    private var lastDismissTime: Date = .distantPast
+
     private func setupPanel() {
         let panelRect = NSRect(x: 0, y: 0, width: 440, height: 570)
         let floatingPanel = FloatingPanel(contentRect: panelRect)
+
+        let contentView = ClipboardHistoryView(
+            onSelect: { [weak self] item in
+                self?.paste(item: item)
+            },
+            onClose: { [weak self] in
+                self?.hidePanel()
+            }
+        )
+        let hostingView = NSHostingView(rootView: contentView)
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        floatingPanel.contentView = hostingView
+
         self.panel = floatingPanel
     }
 
     public func togglePanel() {
         guard let panel = panel else { return }
+        // Prevent immediate re-toggle if clicked menu bar icon while click-outside fired
+        if !panel.isVisible && Date().timeIntervalSince(lastDismissTime) < 0.25 {
+            return
+        }
         if panel.isVisible {
             hidePanel()
         } else {
@@ -73,21 +93,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardHistoryStore.shared.isSettingsOpen = showSettings
         ClipboardHistoryStore.shared.updateStorageStats()
 
-        // Attach fresh NSHostingView so all items render with up-to-date state
-        let contentView = ClipboardHistoryView(
-            onSelect: { [weak self] item in
-                self?.paste(item: item)
-            },
-            onClose: { [weak self] in
-                self?.hidePanel()
-            }
-        )
-        let hostingView = NSHostingView(rootView: contentView)
-        hostingView.wantsLayer = true
-        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-        panel.contentView = hostingView
-
         panel.positionNearMouseOrCenter()
+        NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         panel.invalidateShadow()
         panel.startClickOutsideMonitor()
@@ -99,6 +106,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func hidePanel() {
+        lastDismissTime = Date()
         GlobalHotKeyManager.shared.stopRecording(cancelled: true)
         ClipboardHistoryStore.shared.previewItem = nil
         panel?.stopClickOutsideMonitor()

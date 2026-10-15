@@ -38,7 +38,10 @@ Built with **Swift**, **SwiftUI**, and **AppKit** for Apple Silicon and macOS 13
 | **`↵`** (Return) | Paste selected item into active app |
 | **`⇧ + ↵`** (Shift + Return) | Paste selected item as **Plain Text** |
 | **`Space`** or **`⌘ + Y`** | Open / close **Quick Look Preview** |
-| **`Esc`** | Dismiss Quick Look preview or dismiss clipboard popup |
+| **`⌘ + P`** | Pin or unpin selected clip |
+| **`⌘ + ⌫`** *(or `Delete`)* | Delete selected clip from history |
+| **`⌘ + C`** | Copy selected clip without dismissing popup |
+| **`Esc`** | Clear search filter, dismiss Quick Look, or dismiss popup |
 | **Click outside** | Auto-closes popup |
 
 ---

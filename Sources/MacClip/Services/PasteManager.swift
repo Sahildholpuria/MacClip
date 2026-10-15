@@ -76,13 +76,15 @@ public final class PasteManager: ObservableObject {
             // File URL flavor (Finder, file drop targets)
             pbItem.setString(fileURL.absoluteString, forType: NSPasteboard.PasteboardType("public.file-url"))
 
-            pasteboard.writeObjects([pbItem])
+            pasteboard.writeObjects([pbItem, fileURL as NSURL])
             logTrace("Wrote image to pasteboard (PNG + TIFF + fileURL): bytes=\(imgData.count)")
         } else {
             ClipboardMonitor.shared.lastSelfPastedText = item.text
             pasteboard.setString(item.text, forType: .string)
             logTrace("Wrote plain text to pasteboard: [\(item.text.prefix(30))]")
         }
+
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
 
         // 2. Hide MacClip so target app returns to foreground
         NSApp.hide(nil)
@@ -102,15 +104,17 @@ public final class PasteManager: ObservableObject {
     }
 
     private func performPaste(targetApp: NSRunningApplication?) {
-        // Delay 120ms for target app activation and focus restoration
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+        // Dispatch to background queue to avoid blocking main thread with sleep
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.12) {
             logTrace("Executing performPaste simulation")
 
             if let app = targetApp, !app.isActive {
-                if #available(macOS 14.0, *) {
-                    app.activate()
-                } else {
-                    app.activate(options: [.activateIgnoringOtherApps])
+                DispatchQueue.main.async {
+                    if #available(macOS 14.0, *) {
+                        app.activate()
+                    } else {
+                        app.activate(options: [.activateIgnoringOtherApps])
+                    }
                 }
             }
 
@@ -135,7 +139,7 @@ public final class PasteManager: ObservableObject {
 
             // Post to hardware HID tap
             eventDown.post(tap: .cghidEventTap)
-            usleep(25000) // 25ms gap between key down and key up
+            usleep(25000) // 25ms gap between key down and key up on background thread
             eventUp.post(tap: .cghidEventTap)
 
             logTrace("CGEvent Cmd+V posted to cghidEventTap successfully!")

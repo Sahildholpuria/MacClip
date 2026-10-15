@@ -7,6 +7,8 @@ public struct ClipboardHistoryView: View {
     @ObservedObject var pasteManager = PasteManager.shared
     @ObservedObject var launchManager = LaunchAtLoginManager.shared
 
+    @FocusState private var isSearchFocused: Bool
+
     public var onSelect: ((ClipboardItem) -> Void)?
     public var onClose: (() -> Void)?
 
@@ -67,10 +69,10 @@ public struct ClipboardHistoryView: View {
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.30),
+                            Color.white.opacity(0.35),
                             Color.white.opacity(0.12),
-                            Color.white.opacity(0.04),
-                            Color.white.opacity(0.16)
+                            Color.primary.opacity(0.04),
+                            Color.white.opacity(0.18)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -78,6 +80,23 @@ public struct ClipboardHistoryView: View {
                     lineWidth: 1
                 )
         )
+        .onAppear {
+            isSearchFocused = true
+        }
+        .onChange(of: store.isSettingsOpen) { isOpen in
+            if !isOpen && store.previewItem == nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isSearchFocused = true
+                }
+            }
+        }
+        .onChange(of: store.previewItem) { preview in
+            if preview == nil && !store.isSettingsOpen {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isSearchFocused = true
+                }
+            }
+        }
     }
 
     // MARK: - Glass Separator
@@ -202,6 +221,7 @@ public struct ClipboardHistoryView: View {
                     TextField("Search clips, links, images...", text: $store.searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
+                        .focused($isSearchFocused)
                         .onSubmit {
                             if !store.filteredItems.isEmpty && store.selectedIndex < store.filteredItems.count {
                                 onSelect?(store.filteredItems[store.selectedIndex])
@@ -1013,7 +1033,7 @@ public struct ClipboardHistoryView: View {
                 .padding(.horizontal, 4)
 
                 // Preview Content Area
-                if item.itemType == .image, let path = item.imagePath, let nsImage = NSImage(contentsOfFile: path) {
+                if item.itemType == .image, let path = item.imagePath, let nsImage = ImageCache.shared.image(for: path) {
                     // IMAGE PREVIEW
                     VStack(spacing: 12) {
                         Image(nsImage: nsImage)
@@ -1077,37 +1097,99 @@ public struct ClipboardHistoryView: View {
                             .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
                     )
                 } else if item.category == .color {
-                    // COLOR PREVIEW
-                    VStack(alignment: .leading, spacing: 12) {
+                    // COLOR PREVIEW (HEX, RGB, HSL)
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 14) {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(Color(hexString: item.text))
-                                .frame(width: 70, height: 70)
+                                .frame(width: 72, height: 72)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+                                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
                                 )
-                                .shadow(color: Color.black.opacity(0.15), radius: 6, y: 3)
+                                .shadow(color: Color.black.opacity(0.18), radius: 6, y: 3)
 
-                            VStack(alignment: .leading, spacing: 5) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text(item.text)
-                                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                    .font(.system(size: 19, weight: .bold, design: .monospaced))
                                     .foregroundColor(.primary)
 
-                                Text("Hex Color Code")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
+                                if let rgb = item.rgbColorString {
+                                    Text(rgb)
+                                        .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                }
+
+                                if let hsl = item.hslColorString {
+                                    Text(hsl)
+                                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                        .foregroundColor(.secondary.opacity(0.8))
+                                }
                             }
                         }
 
-                        HStack(spacing: 8) {
-                            Button("Copy HEX") {
+                        // Quick Format Copy Pills
+                        HStack(spacing: 6) {
+                            Button(action: {
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(item.text, forType: .string)
+                                NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 9))
+                                    Text("HEX")
+                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                }
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4.5)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.6))
                             }
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                            .buttonStyle(.plain)
+
+                            if let rgb = item.rgbColorString {
+                                Button(action: {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(rgb, forType: .string)
+                                    NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "doc.on.doc")
+                                            .font(.system(size: 9))
+                                        Text("RGB")
+                                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    }
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4.5)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.6))
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            if let hsl = item.hslColorString {
+                                Button(action: {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(hsl, forType: .string)
+                                    NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "doc.on.doc")
+                                            .font(.system(size: 9))
+                                        Text("HSL")
+                                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    }
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4.5)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.6))
+                                }
+                                .buttonStyle(.plain)
+                            }
 
                             Spacer()
 
@@ -1120,11 +1202,12 @@ public struct ClipboardHistoryView: View {
                                     Text("Paste (↵)")
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 5)
                                 .background(Color.accentColor)
                                 .foregroundColor(.white)
                                 .clipShape(Capsule())
+                                .shadow(color: Color.accentColor.opacity(0.35), radius: 4, y: 1)
                             }
                             .buttonStyle(.plain)
                         }
@@ -1466,6 +1549,30 @@ public struct ClipboardHistoryView: View {
                 .background(Color.white.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
 
+                HStack(spacing: 2) {
+                    Text("⌘P")
+                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                    Text("Pin")
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 4.5)
+                .padding(.vertical, 2)
+                .background(Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                HStack(spacing: 2) {
+                    Text("⌘⌫")
+                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                    Text("Del")
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 4.5)
+                .padding(.vertical, 2)
+                .background(Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
                 Text(hotkeyManager.currentSetting.displayString)
                     .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundColor(.secondary)
@@ -1545,7 +1652,7 @@ struct ClipboardItemRow: View {
                         }
 
                         // Preview: Image or Text
-                        if item.itemType == .image, let path = item.imagePath, let nsImage = NSImage(contentsOfFile: path) {
+                        if item.itemType == .image, let path = item.imagePath, let nsImage = ImageCache.shared.image(for: path) {
                             ZStack(alignment: .bottomTrailing) {
                                 Image(nsImage: nsImage)
                                     .resizable()
@@ -1790,14 +1897,24 @@ func cleanURL(_ urlString: String) -> String {
           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
         return urlString
     }
-    let trackingParams: Set<String> = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "msclkid", "ref"]
-    components.queryItems = components.queryItems?.filter { !trackingParams.contains($0.name.lowercased()) }
+    let trackingParams: Set<String> = [
+        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+        "fbclid", "gclid", "msclkid", "ref", "igshid", "mc_cid", "mc_eid",
+        "yclid", "_hsenc", "_hsmi", "mkt_tok"
+    ]
+    if let existing = components.queryItems {
+        let filtered = existing.filter { !trackingParams.contains($0.name.lowercased()) }
+        components.queryItems = filtered.isEmpty ? nil : filtered
+    }
     return components.string ?? urlString
 }
 
 extension Color {
     init(hexString: String) {
-        let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var hex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hex.hasPrefix("#") { hex.removeFirst() }
+        else if hex.lowercased().hasPrefix("0x") { hex.removeFirst(2) }
+
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
