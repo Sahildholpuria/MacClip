@@ -61,7 +61,7 @@ public struct ClipboardHistoryView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
         }
-        .frame(width: 440, height: 570)
+        .frame(width: 456, height: 575)
         .background(
             ZStack {
                 VisualEffectBackground()
@@ -1577,12 +1577,13 @@ public struct ClipboardHistoryView: View {
     private var footerView: some View {
         HStack {
             // Count indicators
+            // Left Group: Count indicators & Clear Unpinned
             HStack(spacing: 6) {
                 HStack(spacing: 4) {
                     Image(systemName: "square.stack.3d.up.fill")
-                        .font(.system(size: 9.5))
+                        .font(.system(size: 9))
                     Text("\(store.items.count)")
-                        .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
                 }
                 .foregroundColor(.secondary)
                 .padding(.horizontal, 6)
@@ -1595,9 +1596,9 @@ public struct ClipboardHistoryView: View {
                 if pinnedCount > 0 {
                     HStack(spacing: 3) {
                         Image(systemName: "pin.fill")
-                            .font(.system(size: 8.5))
+                            .font(.system(size: 8))
                         Text("\(pinnedCount)")
-                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
                     }
                     .foregroundColor(.orange)
                     .padding(.horizontal, 6)
@@ -1606,45 +1607,35 @@ public struct ClipboardHistoryView: View {
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(Color.orange.opacity(0.25), lineWidth: 0.6))
                 }
-            }
 
-            Spacer()
-
-            if !store.items.isEmpty && !store.isSettingsOpen {
-                Button("Clear Unpinned") {
-                    withAnimation {
-                        store.clearUnpinned()
+                if !store.items.isEmpty && !store.isSettingsOpen {
+                    Button(action: {
+                        withAnimation {
+                            store.clearUnpinned()
+                        }
+                    }) {
+                        Text("Clear Unpinned")
+                            .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary.opacity(0.85))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.white.opacity(0.04))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.6))
                     }
+                    .buttonStyle(.plain)
+                    .help("Clear all unpinned clips")
                 }
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundColor(.secondary.opacity(0.8))
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Color.white.opacity(0.04))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.6))
-                .buttonStyle(.plain)
             }
 
-            // Keyboard hints
-            HStack(spacing: 5) {
+            Spacer(minLength: 10)
+
+            // Right Group: Keyboard shortcut hints (guaranteed non-wrapping)
+            HStack(spacing: 4.5) {
                 footerKeycapHint(key: "↵", label: "Paste")
                 footerKeycapHint(key: "⇧↵", label: "Plain")
                 footerKeycapHint(key: "Space", label: "Preview")
-                footerKeycapHint(key: "⌘P", label: "Pin")
                 footerKeycapHint(key: "⌘⌫", label: "Del")
-
-                Text(hotkeyManager.currentSetting.displayString)
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(.accentColor.opacity(0.9))
-                    .padding(.horizontal, 5.5)
-                    .padding(.vertical, 2.5)
-                    .background(Color.accentColor.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4.5, style: .continuous)
-                            .stroke(Color.accentColor.opacity(0.25), lineWidth: 0.6)
-                    )
             }
         }
     }
@@ -1653,12 +1644,12 @@ public struct ClipboardHistoryView: View {
         HStack(spacing: 3) {
             Text(key)
                 .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                .foregroundColor(.primary.opacity(0.85))
-                .padding(.horizontal, 3.5)
-                .padding(.vertical, 1.5)
+                .foregroundColor(.primary.opacity(0.9))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
                 .background(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.12), Color.white.opacity(0.04)],
+                        colors: [Color.white.opacity(0.14), Color.white.opacity(0.05)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -1666,21 +1657,26 @@ public struct ClipboardHistoryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+                        .strokeBorder(Color.white.opacity(0.20), lineWidth: 0.6)
                 )
+                .lineLimit(1)
+                .fixedSize()
 
             Text(label)
-                .font(.system(size: 8.5, weight: .medium, design: .rounded))
-                .foregroundColor(.secondary.opacity(0.85))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary.opacity(0.9))
+                .lineLimit(1)
+                .fixedSize()
         }
-        .padding(.horizontal, 3.5)
-        .padding(.vertical, 2)
-        .background(Color.white.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2.5)
+        .background(Color.white.opacity(0.035))
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 4.5, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.07), lineWidth: 0.5)
         )
+        .fixedSize()
     }
 }
 

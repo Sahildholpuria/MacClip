@@ -40,7 +40,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastDismissTime: Date = .distantPast
 
     private func setupPanel() {
-        let panelRect = NSRect(x: 0, y: 0, width: 440, height: 570)
+        let panelRect = NSRect(x: 0, y: 0, width: 456, height: 575)
         let floatingPanel = FloatingPanel(contentRect: panelRect)
 
         let contentView = ClipboardHistoryView(
