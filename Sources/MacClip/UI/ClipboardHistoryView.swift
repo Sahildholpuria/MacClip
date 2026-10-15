@@ -62,24 +62,57 @@ public struct ClipboardHistoryView: View {
                 .padding(.vertical, 10)
         }
         .frame(width: 440, height: 570)
-        .background(VisualEffectBackground())
+        .background(
+            ZStack {
+                VisualEffectBackground()
+
+                // Caustic Liquid Glass Lighting Layer (Refraction Glow)
+                RadialGradient(
+                    colors: [
+                        Color.accentColor.opacity(0.14),
+                        Color.indigo.opacity(0.04),
+                        Color.clear
+                    ],
+                    center: .topLeading,
+                    startRadius: 20,
+                    endRadius: 380
+                )
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.06),
+                        Color.clear,
+                        Color.black.opacity(0.12)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        )
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.35),
-                            Color.white.opacity(0.12),
-                            Color.primary.opacity(0.04),
-                            Color.white.opacity(0.18)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+            // Dual-layer specular glass rim
+            ZStack {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.42),
+                                Color.white.opacity(0.16),
+                                Color.primary.opacity(0.04),
+                                Color.white.opacity(0.24)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.2
+                    )
+
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.15), lineWidth: 0.5)
+            }
         )
+        .shadow(color: Color.black.opacity(0.28), radius: 24, y: 12)
         .onAppear {
             isSearchFocused = true
         }
@@ -99,21 +132,37 @@ public struct ClipboardHistoryView: View {
         }
     }
 
-    // MARK: - Glass Separator
+    // MARK: - Glass Separator (Dual-Hairline Physical Etched Groove)
     private var glassDivider: some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.0),
-                        Color.white.opacity(0.12),
-                        Color.white.opacity(0.0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.16),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
                 )
-            )
-            .frame(height: 1)
+                .frame(height: 0.8)
+
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(0.0),
+                            Color.black.opacity(0.22),
+                            Color.black.opacity(0.0)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 0.8)
+        }
     }
 
     // MARK: - Header (Search + Glass Buttons)
@@ -212,15 +261,16 @@ public struct ClipboardHistoryView: View {
                 .buttonStyle(.plain)
                 .help("Close Preview (Space / Esc)")
             } else {
-                // Search Pill
+                // Search Pill (Apple Liquid Glass Field)
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(store.searchText.isEmpty ? .secondary.opacity(0.7) : .accentColor)
-                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(isSearchFocused ? .accentColor : .secondary.opacity(0.75))
+                        .font(.system(size: 13, weight: isSearchFocused ? .semibold : .medium))
+                        .shadow(color: isSearchFocused ? Color.accentColor.opacity(0.4) : Color.clear, radius: 4)
 
                     TextField("Search clips, links, images...", text: $store.searchText)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, weight: .regular, design: .default))
                         .focused($isSearchFocused)
                         .onSubmit {
                             if !store.filteredItems.isEmpty && store.selectedIndex < store.filteredItems.count {
@@ -229,55 +279,69 @@ public struct ClipboardHistoryView: View {
                         }
 
                     if !store.searchText.isEmpty {
-                        Button(action: { store.searchText = "" }) {
+                        Button(action: {
+                            store.searchText = ""
+                            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                        }) {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.secondary)
                                 .font(.system(size: 13))
                         }
                         .buttonStyle(.plain)
+                        .transition(.scale.combined(with: .opacity))
                     }
                 }
-                .padding(.horizontal, 11)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7.5)
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.07))
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .fill(isSearchFocused ? Color.white.opacity(0.09) : Color.white.opacity(0.055))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .strokeBorder(
                             LinearGradient(
-                                colors: [Color.white.opacity(0.25), Color.white.opacity(0.08)],
+                                colors: isSearchFocused
+                                    ? [Color.accentColor.opacity(0.65), Color.accentColor.opacity(0.3)]
+                                    : [Color.white.opacity(0.24), Color.white.opacity(0.06)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 0.8
+                            lineWidth: isSearchFocused ? 1.2 : 0.8
                         )
                 )
+                .shadow(color: isSearchFocused ? Color.accentColor.opacity(0.18) : Color.clear, radius: 6, y: 1)
 
-                // Settings Toggle Icon
+                // Settings Toggle Pebble
                 Button(action: {
                     if store.isSettingsOpen && hotkeyManager.isRecording {
                         hotkeyManager.stopRecording(cancelled: true)
                     }
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
                         store.isSettingsOpen.toggle()
                     }
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
                 }) {
-                    Image(systemName: "slider.horizontal.3")
+                    Image(systemName: store.isSettingsOpen ? "slider.horizontal.3.fill" : "slider.horizontal.3")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondary)
-                        .padding(7)
-                        .background(Color.white.opacity(0.07))
-                        .clipShape(Circle())
+                        .foregroundColor(store.isSettingsOpen ? .accentColor : .secondary)
+                        .padding(7.5)
+                        .background(
+                            Circle()
+                                .fill(store.isSettingsOpen ? Color.accentColor.opacity(0.15) : Color.white.opacity(0.06))
+                        )
                         .overlay(
-                            Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.8)
+                            Circle()
+                                .strokeBorder(
+                                    store.isSettingsOpen ? Color.accentColor.opacity(0.4) : Color.white.opacity(0.14),
+                                    lineWidth: 0.8
+                                )
                         )
                 }
                 .buttonStyle(.plain)
                 .help("Preferences & Shortcuts")
 
-                // Close Button
+                // Close Pebble
                 Button(action: {
                     if hotkeyManager.isRecording {
                         hotkeyManager.stopRecording(cancelled: true)
@@ -287,11 +351,10 @@ public struct ClipboardHistoryView: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.secondary)
-                        .padding(7)
-                        .background(Color.white.opacity(0.07))
-                        .clipShape(Circle())
+                        .padding(7.5)
+                        .background(Circle().fill(Color.white.opacity(0.06)))
                         .overlay(
-                            Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.8)
+                            Circle().strokeBorder(Color.white.opacity(0.14), lineWidth: 0.8)
                         )
                 }
                 .buttonStyle(.plain)
@@ -300,100 +363,135 @@ public struct ClipboardHistoryView: View {
         }
     }
 
-    // MARK: - Category Filter Bar
+    // MARK: - Category Filter Bar (Unified Liquid Glass Tray)
     private var categoryFilterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 5) {
-                ForEach(ClipboardHistoryStore.FilterCategory.allCases) { category in
-                    let isSelected = store.selectedCategory == category
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.14)) {
-                            store.selectedCategory = category
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: category.iconName)
-                                .font(.system(size: 10, weight: isSelected ? .bold : .medium))
-
-                            Text(category.rawValue)
-                                .font(.system(size: 11, weight: isSelected ? .semibold : .regular, design: .rounded))
-
-                            let c = store.count(for: category)
-                            if c > 0 {
-                                Text("\(c)")
-                                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(isSelected ? Color.white.opacity(0.28) : Color.primary.opacity(0.08))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4.5)
-                        .background(
-                            Group {
-                                if isSelected {
-                                    LinearGradient(
-                                        colors: [Color.accentColor.opacity(0.9), Color.accentColor],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                } else {
-                                    Color.white.opacity(0.05)
-                                }
-                            }
-                        )
-                        .foregroundColor(isSelected ? .white : .primary.opacity(0.75))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(
-                                    isSelected ? Color.white.opacity(0.35) : Color.white.opacity(0.10),
-                                    lineWidth: 0.8
-                                )
-                        )
-                        .shadow(color: isSelected ? Color.accentColor.opacity(0.35) : Color.clear, radius: 4, y: 1)
+        HStack(spacing: 3) {
+            ForEach(ClipboardHistoryStore.FilterCategory.allCases) { category in
+                let isSelected = store.selectedCategory == category
+                Button(action: {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.78)) {
+                        store.selectedCategory = category
                     }
-                    .buttonStyle(.plain)
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+                }) {
+                    HStack(spacing: 4.5) {
+                        Image(systemName: category.iconName)
+                            .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                            .foregroundColor(isSelected ? .white : categoryIconColor(for: category))
+
+                        Text(category.rawValue)
+                            .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .rounded))
+
+                        let c = store.count(for: category)
+                        if c > 0 {
+                            Text("\(c)")
+                                .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                                .padding(.horizontal, 4.5)
+                                .padding(.vertical, 1)
+                                .background(isSelected ? Color.white.opacity(0.3) : Color.primary.opacity(0.08))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4.5)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        ZStack {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .strokeBorder(
+                                                LinearGradient(
+                                                    colors: [Color.white.opacity(0.4), Color.white.opacity(0.1)],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 0.8
+                                            )
+                                    )
+                                    .shadow(color: Color.accentColor.opacity(0.35), radius: 4, y: 1.5)
+                            } else {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.white.opacity(0.001))
+                            }
+                        }
+                    )
+                    .foregroundColor(isSelected ? .white : .primary.opacity(0.75))
                 }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 1)
+        }
+        .padding(3)
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(Color.black.opacity(0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+        )
+    }
+
+    private func categoryIconColor(for cat: ClipboardHistoryStore.FilterCategory) -> Color {
+        switch cat {
+        case .all: return .primary.opacity(0.7)
+        case .pinned: return .orange
+        case .text: return .secondary
+        case .images: return .indigo
+        case .links: return .blue
         }
     }
 
-    // MARK: - Accessibility Banner
+    // MARK: - Accessibility Banner (Liquid Amber Glass)
     private var accessibilityBanner: some View {
         HStack(spacing: 8) {
             Image(systemName: "hand.raised.fill")
                 .foregroundColor(.orange)
                 .font(.system(size: 12))
+                .shadow(color: Color.orange.opacity(0.4), radius: 4)
 
             Text("Auto-paste needs Accessibility permission")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.primary.opacity(0.85))
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundColor(.primary.opacity(0.9))
 
             Spacer()
 
             Button("Grant") {
                 pasteManager.requestAccessibility()
             }
-            .font(.system(size: 10, weight: .semibold, design: .rounded))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Color.orange)
+            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 3.5)
+            .background(
+                LinearGradient(
+                    colors: [Color.orange, Color.orange.opacity(0.85)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .foregroundColor(.white)
             .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.8))
+            .shadow(color: Color.orange.opacity(0.35), radius: 3, y: 1)
 
             Button("Verify") {
                 pasteManager.checkAccessibility()
             }
             .font(.system(size: 10, weight: .medium, design: .rounded))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Color.white.opacity(0.1))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3.5)
+            .background(Color.white.opacity(0.08))
             .foregroundColor(.primary)
             .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.8))
+            .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.8))
 
             Button(action: { pasteManager.dismissBanner() }) {
                 Image(systemName: "xmark")
@@ -404,14 +502,21 @@ public struct ClipboardHistoryView: View {
             .buttonStyle(.plain)
         }
         .padding(.vertical, 6)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 11)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.orange.opacity(0.12))
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(Color.orange.opacity(0.11))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.orange.opacity(0.3), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.4), Color.orange.opacity(0.18)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.8
+                )
         )
     }
 
@@ -1128,24 +1233,38 @@ public struct ClipboardHistoryView: View {
                             }
                         }
 
-                        // Quick Format Copy Pills
+                        // Quick Format Copy Pills with Animated Feedback
                         HStack(spacing: 6) {
                             Button(action: {
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(item.text, forType: .string)
                                 NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                                    store.copiedFeedbackKey = "HEX"
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                                    if store.copiedFeedbackKey == "HEX" {
+                                        withAnimation { store.copiedFeedbackKey = nil }
+                                    }
+                                }
                             }) {
                                 HStack(spacing: 4) {
-                                    Image(systemName: "doc.on.doc")
-                                        .font(.system(size: 9))
-                                    Text("HEX")
+                                    Image(systemName: store.copiedFeedbackKey == "HEX" ? "checkmark" : "doc.on.doc")
+                                        .font(.system(size: 8.5, weight: .bold))
+                                    Text(store.copiedFeedbackKey == "HEX" ? "Copied ✓" : "HEX")
                                         .font(.system(size: 10, weight: .bold, design: .rounded))
                                 }
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 4.5)
-                                .background(Color.white.opacity(0.08))
+                                .background(store.copiedFeedbackKey == "HEX" ? Color.green.opacity(0.2) : Color.white.opacity(0.08))
+                                .foregroundColor(store.copiedFeedbackKey == "HEX" ? .green : .primary)
                                 .clipShape(Capsule())
-                                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.6))
+                                .overlay(
+                                    Capsule().stroke(
+                                        store.copiedFeedbackKey == "HEX" ? Color.green.opacity(0.4) : Color.white.opacity(0.15),
+                                        lineWidth: 0.6
+                                    )
+                                )
                             }
                             .buttonStyle(.plain)
 
@@ -1154,18 +1273,32 @@ public struct ClipboardHistoryView: View {
                                     NSPasteboard.general.clearContents()
                                     NSPasteboard.general.setString(rgb, forType: .string)
                                     NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                                        store.copiedFeedbackKey = "RGB"
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                                        if store.copiedFeedbackKey == "RGB" {
+                                            withAnimation { store.copiedFeedbackKey = nil }
+                                        }
+                                    }
                                 }) {
                                     HStack(spacing: 4) {
-                                        Image(systemName: "doc.on.doc")
-                                            .font(.system(size: 9))
-                                        Text("RGB")
+                                        Image(systemName: store.copiedFeedbackKey == "RGB" ? "checkmark" : "doc.on.doc")
+                                            .font(.system(size: 8.5, weight: .bold))
+                                        Text(store.copiedFeedbackKey == "RGB" ? "Copied ✓" : "RGB")
                                             .font(.system(size: 10, weight: .bold, design: .rounded))
                                     }
                                     .padding(.horizontal, 9)
                                     .padding(.vertical, 4.5)
-                                    .background(Color.white.opacity(0.08))
+                                    .background(store.copiedFeedbackKey == "RGB" ? Color.green.opacity(0.2) : Color.white.opacity(0.08))
+                                    .foregroundColor(store.copiedFeedbackKey == "RGB" ? .green : .primary)
                                     .clipShape(Capsule())
-                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.6))
+                                    .overlay(
+                                        Capsule().stroke(
+                                            store.copiedFeedbackKey == "RGB" ? Color.green.opacity(0.4) : Color.white.opacity(0.15),
+                                            lineWidth: 0.6
+                                        )
+                                    )
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -1175,18 +1308,32 @@ public struct ClipboardHistoryView: View {
                                     NSPasteboard.general.clearContents()
                                     NSPasteboard.general.setString(hsl, forType: .string)
                                     NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                                        store.copiedFeedbackKey = "HSL"
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                                        if store.copiedFeedbackKey == "HSL" {
+                                            withAnimation { store.copiedFeedbackKey = nil }
+                                        }
+                                    }
                                 }) {
                                     HStack(spacing: 4) {
-                                        Image(systemName: "doc.on.doc")
-                                            .font(.system(size: 9))
-                                        Text("HSL")
+                                        Image(systemName: store.copiedFeedbackKey == "HSL" ? "checkmark" : "doc.on.doc")
+                                            .font(.system(size: 8.5, weight: .bold))
+                                        Text(store.copiedFeedbackKey == "HSL" ? "Copied ✓" : "HSL")
                                             .font(.system(size: 10, weight: .bold, design: .rounded))
                                     }
                                     .padding(.horizontal, 9)
                                     .padding(.vertical, 4.5)
-                                    .background(Color.white.opacity(0.08))
+                                    .background(store.copiedFeedbackKey == "HSL" ? Color.green.opacity(0.2) : Color.white.opacity(0.08))
+                                    .foregroundColor(store.copiedFeedbackKey == "HSL" ? .green : .primary)
                                     .clipShape(Capsule())
-                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.6))
+                                    .overlay(
+                                        Capsule().stroke(
+                                            store.copiedFeedbackKey == "HSL" ? Color.green.opacity(0.4) : Color.white.opacity(0.15),
+                                            lineWidth: 0.6
+                                        )
+                                    )
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -1256,11 +1403,28 @@ public struct ClipboardHistoryView: View {
 
                             let clean = cleanURL(item.text)
                             if clean != item.text {
-                                Button("Clean URL") {
+                                Button(action: {
                                     NSPasteboard.general.clearContents()
                                     NSPasteboard.general.setString(clean, forType: .string)
+                                    NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                                        store.copiedFeedbackKey = "clean"
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                                        if store.copiedFeedbackKey == "clean" {
+                                            withAnimation { store.copiedFeedbackKey = nil }
+                                        }
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        if store.copiedFeedbackKey == "clean" {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 9, weight: .bold))
+                                        }
+                                        Text(store.copiedFeedbackKey == "clean" ? "Clean Copied ✓" : "Clean URL")
+                                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                                    }
                                 }
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
                             }
@@ -1513,79 +1677,97 @@ public struct ClipboardHistoryView: View {
 
             // Keyboard hints
             HStack(spacing: 5) {
-                HStack(spacing: 2) {
-                    Text("↵")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    Text("Paste")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                }
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 4.5)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                HStack(spacing: 2) {
-                    Text("⇧↵")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    Text("Plain")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                }
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 4.5)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                HStack(spacing: 2) {
-                    Text("Space")
-                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                    Text("Preview")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                }
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 4.5)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                HStack(spacing: 2) {
-                    Text("⌘P")
-                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                    Text("Pin")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                }
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 4.5)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                HStack(spacing: 2) {
-                    Text("⌘⌫")
-                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                    Text("Del")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                }
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 4.5)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                footerKeycapHint(key: "↵", label: "Paste")
+                footerKeycapHint(key: "⇧↵", label: "Plain")
+                footerKeycapHint(key: "Space", label: "Preview")
+                footerKeycapHint(key: "⌘P", label: "Pin")
+                footerKeycapHint(key: "⌘⌫", label: "Del")
 
                 Text(hotkeyManager.currentSetting.displayString)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(.accentColor.opacity(0.9))
+                    .padding(.horizontal, 5.5)
+                    .padding(.vertical, 2.5)
+                    .background(Color.accentColor.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 0.6)
+                        RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                            .stroke(Color.accentColor.opacity(0.25), lineWidth: 0.6)
                     )
             }
         }
+    }
+
+    private func footerKeycapHint(key: String, label: String) -> some View {
+        HStack(spacing: 3) {
+            Text(key)
+                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                .foregroundColor(.primary.opacity(0.85))
+                .padding(.horizontal, 3.5)
+                .padding(.vertical, 1.5)
+                .background(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.12), Color.white.opacity(0.04)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+                )
+
+            Text(label)
+                .font(.system(size: 8.5, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary.opacity(0.85))
+        }
+        .padding(.horizontal, 3.5)
+        .padding(.vertical, 2)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - Apple Keycap Badge (⌘1..⌘9)
+struct AppleKeycapBadge: View {
+    let text: String
+    let isSelected: Bool
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .foregroundColor(isSelected ? .accentColor : .primary.opacity(0.85))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2.5)
+            .background(
+                LinearGradient(
+                    colors: isSelected
+                    ? [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0.12)]
+                    : [Color.white.opacity(0.14), Color.white.opacity(0.04)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: isSelected
+                            ? [Color.accentColor.opacity(0.7), Color.accentColor.opacity(0.3)]
+                            : [Color.white.opacity(0.30), Color.white.opacity(0.08)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 0.75
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.18), radius: 1, y: 1)
     }
 }
 
@@ -1599,23 +1781,14 @@ struct ClipboardItemRow: View {
     let onDelete: () -> Void
 
     var body: some View {
+        let isRowHovered = (ClipboardHistoryStore.shared.hoveredIndex == index)
         HStack(alignment: .center, spacing: 8) {
             // Main clickable card area
             Button(action: onSelect) {
                 HStack(alignment: .top, spacing: 10) {
-                    // Quick shortcut badge (⌘1..⌘9)
+                    // Quick shortcut keycap badge (⌘1..⌘9)
                     if index < 9 {
-                        Text("⌘\(index + 1)")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundColor(isSelected ? .accentColor : .secondary.opacity(0.8))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2.5)
-                            .background(isSelected ? Color.accentColor.opacity(0.15) : Color.white.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                    .stroke(isSelected ? Color.accentColor.opacity(0.4) : Color.white.opacity(0.12), lineWidth: 0.6)
-                            )
+                        AppleKeycapBadge(text: "⌘\(index + 1)", isSelected: isSelected)
                             .padding(.top, 2)
                     } else {
                         Spacer().frame(width: 24)
@@ -1651,7 +1824,7 @@ struct ClipboardItemRow: View {
                                 .foregroundColor(.secondary.opacity(0.7))
                         }
 
-                        // Preview: Image or Text
+                        // Preview: Image, Color, Code, Link, or Plain Text
                         if item.itemType == .image, let path = item.imagePath, let nsImage = ImageCache.shared.image(for: path) {
                             ZStack(alignment: .bottomTrailing) {
                                 Image(nsImage: nsImage)
@@ -1680,6 +1853,43 @@ struct ClipboardItemRow: View {
                                 }
                             }
                             .padding(.vertical, 2)
+                        } else if item.category == .color {
+                            HStack(spacing: 8) {
+                                RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                                    .fill(Color(hexString: item.text))
+                                    .frame(width: 15, height: 15)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 0.8)
+                                    )
+                                    .shadow(color: Color.black.opacity(0.2), radius: 1.5, y: 0.5)
+
+                                Text(item.text)
+                                    .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.primary)
+
+                                if let rgb = item.rgbColorString {
+                                    Text(rgb)
+                                        .font(.system(size: 10.5, weight: .regular, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        } else if item.category == .code {
+                            Text(item.text)
+                                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                .foregroundColor(.primary)
+                                .lineLimit(3)
+                                .truncationMode(.tail)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else if item.category == .url {
+                            Text(item.text)
+                                .font(.system(size: 12.5, weight: .regular))
+                                .foregroundColor(.blue.opacity(0.95))
+                                .lineLimit(2)
+                                .truncationMode(.middle)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         } else {
                             Text(item.text)
                                 .font(.system(size: 12.5, weight: .regular))
@@ -1698,8 +1908,7 @@ struct ClipboardItemRow: View {
 
             // Actions: Quick Look, Paste, Pin, Trash
             HStack(spacing: 5) {
-                let isHovered = ClipboardHistoryStore.shared.hoveredIndex == index
-                if isSelected || isHovered {
+                if isSelected || isRowHovered {
                     Button(action: {
                         ClipboardHistoryStore.shared.togglePreview(for: item)
                     }) {
@@ -1707,10 +1916,10 @@ struct ClipboardItemRow: View {
                             .font(.system(size: 9))
                             .foregroundColor(.secondary)
                             .padding(5.5)
-                            .background(Color.white.opacity(0.08))
+                            .background(Color.white.opacity(0.10))
                             .clipShape(Circle())
                             .overlay(
-                                Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.6)
+                                Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.6)
                             )
                     }
                     .buttonStyle(.plain)
@@ -1735,9 +1944,16 @@ struct ClipboardItemRow: View {
                         .foregroundColor(.white)
                         .clipShape(Capsule())
                         .overlay(
-                            Capsule().stroke(Color.white.opacity(0.35), lineWidth: 0.8)
+                            Capsule().strokeBorder(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.45), Color.white.opacity(0.15)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 0.8
+                            )
                         )
-                        .shadow(color: Color.accentColor.opacity(0.35), radius: 4, y: 1)
+                        .shadow(color: Color.accentColor.opacity(0.38), radius: 4, y: 1.5)
                     }
                     .buttonStyle(.plain)
                     .help("Paste into current app (↵) • Hold Shift for plain text (⇧↵)")
@@ -1745,31 +1961,44 @@ struct ClipboardItemRow: View {
 
                 Button(action: onTogglePin) {
                     Image(systemName: item.isPinned ? "pin.fill" : "pin")
-                        .font(.system(size: 11))
-                        .foregroundColor(item.isPinned ? .orange : .secondary.opacity(0.45))
-                        .padding(5)
-                        .background(Color.white.opacity(item.isPinned ? 0.12 : 0.04))
+                        .font(.system(size: 10.5))
+                        .foregroundColor(item.isPinned ? .orange : .secondary.opacity(0.5))
+                        .padding(5.5)
+                        .background(
+                            item.isPinned
+                            ? Color.orange.opacity(0.18)
+                            : Color.white.opacity(0.04)
+                        )
                         .clipShape(Circle())
                         .overlay(
-                            Circle().stroke(Color.white.opacity(item.isPinned ? 0.25 : 0.08), lineWidth: 0.6)
+                            Circle().strokeBorder(
+                                item.isPinned
+                                ? Color.orange.opacity(0.35)
+                                : Color.white.opacity(0.10),
+                                lineWidth: 0.6
+                            )
                         )
+                        .shadow(color: item.isPinned ? Color.orange.opacity(0.2) : Color.clear, radius: 3)
                 }
                 .buttonStyle(.plain)
-                .help(item.isPinned ? "Unpin clip" : "Pin clip")
+                .help(item.isPinned ? "Unpin clip (⌘P)" : "Pin clip (⌘P)")
 
                 Button(action: onDelete) {
                     Image(systemName: "trash")
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary.opacity(0.45))
-                        .padding(5)
+                        .padding(5.5)
                         .background(Color.white.opacity(0.04))
                         .clipShape(Circle())
                         .overlay(
-                            Circle().stroke(Color.white.opacity(0.08), lineWidth: 0.6)
+                            Circle().strokeBorder(
+                                Color.white.opacity(0.08),
+                                lineWidth: 0.6
+                            )
                         )
                 }
                 .buttonStyle(.plain)
-                .help("Delete clip")
+                .help("Delete clip (⌘⌫)")
             }
         }
         .padding(.vertical, 8)
@@ -1779,16 +2008,23 @@ struct ClipboardItemRow: View {
                 if isSelected {
                     LinearGradient(
                         colors: [
-                            Color.accentColor.opacity(0.18),
-                            Color.accentColor.opacity(0.07)
+                            Color.accentColor.opacity(0.20),
+                            Color.accentColor.opacity(0.08)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                } else if ClipboardHistoryStore.shared.hoveredIndex == index {
-                    Color.white.opacity(0.07)
+                } else if isRowHovered {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.08),
+                            Color.white.opacity(0.03)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 } else {
-                    Color.white.opacity(0.03)
+                    Color.white.opacity(0.032)
                 }
             }
         )
@@ -1799,31 +2035,32 @@ struct ClipboardItemRow: View {
                     isSelected
                     ? LinearGradient(
                         colors: [
-                            Color.accentColor.opacity(0.75),
-                            Color.white.opacity(0.35),
-                            Color.accentColor.opacity(0.4)
+                            Color.accentColor.opacity(0.85),
+                            Color.white.opacity(0.45),
+                            Color.accentColor.opacity(0.35)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                     : LinearGradient(
                         colors: [
-                            Color.white.opacity((ClipboardHistoryStore.shared.hoveredIndex == index) ? 0.22 : 0.08),
-                            Color.white.opacity((ClipboardHistoryStore.shared.hoveredIndex == index) ? 0.08 : 0.02)
+                            Color.white.opacity(isRowHovered ? 0.22 : 0.08),
+                            Color.white.opacity(isRowHovered ? 0.06 : 0.02)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: isSelected ? 1.2 : 0.8
+                    lineWidth: isSelected ? 1.2 : 0.75
                 )
         )
         .shadow(
-            color: isSelected ? Color.accentColor.opacity(0.16) : Color.clear,
-            radius: 5,
-            y: 1.5
+            color: isSelected ? Color.accentColor.opacity(0.20) : (isRowHovered ? Color.black.opacity(0.08) : Color.clear),
+            radius: isSelected ? 6 : 3,
+            y: isSelected ? 2 : 1
         )
-        .onHover { isHovering in
-            if isHovering {
+        .animation(.spring(response: 0.22, dampingFraction: 0.8), value: isSelected)
+        .onHover { hovering in
+            if hovering {
                 ClipboardHistoryStore.shared.hoveredIndex = index
             } else if ClipboardHistoryStore.shared.hoveredIndex == index {
                 ClipboardHistoryStore.shared.hoveredIndex = nil
@@ -1843,9 +2080,9 @@ struct ClipboardItemRow: View {
         .padding(.vertical, 2)
         .background(badgeColor.opacity(0.14))
         .foregroundColor(badgeColor)
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
+            RoundedRectangle(cornerRadius: 4.5, style: .continuous)
                 .stroke(badgeColor.opacity(0.25), lineWidth: 0.6)
         )
     }

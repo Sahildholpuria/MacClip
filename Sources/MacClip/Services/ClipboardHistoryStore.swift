@@ -38,6 +38,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
     @Published public var selectedIndex: Int = 0
     @Published public var hoveredIndex: Int? = nil
+    @Published public var copiedFeedbackKey: String? = nil
     @Published public var isSettingsOpen: Bool = false
     @Published public var previewItem: ClipboardItem? = nil
     @Published public var ignorePasswordManagers: Bool = true {
