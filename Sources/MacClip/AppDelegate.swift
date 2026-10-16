@@ -129,7 +129,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - Draggable NSHostingView
 final class DraggableHostingView<Content: View>: NSHostingView<Content> {
     override var mouseDownCanMoveWindow: Bool {
-        return true
+        return false // Dedicated WindowDragHandle and FloatingPanel perform native performDrag
     }
 }
 

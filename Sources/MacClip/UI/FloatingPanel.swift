@@ -13,7 +13,7 @@ public final class FloatingPanel: NSPanel {
     public init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.nonactivatingPanel, .borderless],
+            styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -24,7 +24,15 @@ public final class FloatingPanel: NSPanel {
         self.isOpaque = false
         self.backgroundColor = .clear
         self.hasShadow = true
-        self.isMovableByWindowBackground = true
+        self.titleVisibility = .hidden
+        self.titlebarAppearsTransparent = true
+        if #available(macOS 11.0, *) {
+            self.titlebarSeparatorStyle = .none
+        }
+        self.standardWindowButton(.closeButton)?.isHidden = true
+        self.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        self.standardWindowButton(.zoomButton)?.isHidden = true
+        self.isMovableByWindowBackground = false
         self.animationBehavior = .utilityWindow
     }
 
@@ -66,13 +74,20 @@ public final class FloatingPanel: NSPanel {
             let hit = self.contentView?.hitTest(loc)
             let isTextOrSlider = (hit is NSTextView) || (hit is NSTextField) || (hit is NSSlider)
 
-            // Dedicated top grab handle (top 22pt)
-            let isGrabHandle = loc.y >= (self.frame.height - 22)
+            // Dedicated top grab handle (top 26pt)
+            let isGrabHandle = loc.y >= (self.frame.height - 26)
+
+            if isGrabHandle {
+                logTrace("FloatingPanel sendEvent: Grab handle clicked, calling performDrag")
+                self.hasUserMovedWindow = true
+                self.performDrag(with: event)
+                return
+            }
 
             // Check if click is inside search input field in default clips view
             let store = ClipboardHistoryStore.shared
             let isInsideSearchField = (!store.isSettingsOpen && store.previewItem == nil) &&
-                (loc.y >= (self.frame.height - 58) && loc.y <= (self.frame.height - 22) && loc.x >= 14 && loc.x <= 400)
+                (loc.y >= (self.frame.height - 62) && loc.y <= (self.frame.height - 24) && loc.x >= 14 && loc.x <= 400)
 
             if !isTextOrSlider && !isInsideSearchField {
                 dragStartMouseLocation = NSEvent.mouseLocation
@@ -80,16 +95,12 @@ public final class FloatingPanel: NSPanel {
                 isDraggingWindow = false
                 canInitiateDrag = true
 
-                if isGrabHandle {
-                    dragDistanceThreshold = 1.0
+                let isFooter = loc.y <= 42
+                let isSideBorder = loc.x <= 14 || loc.x >= (self.frame.width - 14)
+                if isFooter || isSideBorder {
+                    dragDistanceThreshold = 3.0
                 } else {
-                    let isFooter = loc.y <= 42
-                    let isSideBorder = loc.x <= 14 || loc.x >= (self.frame.width - 14)
-                    if isFooter || isSideBorder {
-                        dragDistanceThreshold = 3.0
-                    } else {
-                        dragDistanceThreshold = 8.0
-                    }
+                    dragDistanceThreshold = 8.0
                 }
             } else {
                 canInitiateDrag = false

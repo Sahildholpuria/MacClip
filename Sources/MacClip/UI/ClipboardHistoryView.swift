@@ -20,16 +20,16 @@ public struct ClipboardHistoryView: View {
     public var body: some View {
         VStack(spacing: 0) {
             // Top Window Drag Grab Handle (Apple HIG standard)
-            HStack {
-                Spacer()
+            ZStack {
+                WindowDragHandle()
+                    .frame(height: 22)
+
                 Capsule()
                     .fill(Color.white.opacity(0.35))
                     .frame(width: 48, height: 5)
-                Spacer()
+                    .allowsHitTesting(false)
             }
-            .frame(height: 18)
-            .contentShape(Rectangle())
-            .background(WindowDragArea())
+            .frame(height: 22)
             .help("Drag to move window anywhere on screen")
 
             // Glass Header: Search & Glass Action Buttons
@@ -2129,46 +2129,32 @@ struct ClipboardItemRow: View {
     }
 }
 
-// MARK: - Native Window Dragging View
-public struct WindowDragArea: NSViewRepresentable {
+// MARK: - Native Window Drag Handle (Apple HIG standard)
+public struct WindowDragHandle: NSViewRepresentable {
     public init() {}
 
-    public func makeNSView(context: Context) -> DragView {
-        DragView()
+    public func makeNSView(context: Context) -> DragHandleView {
+        DragHandleView()
     }
 
-    public func updateNSView(_ nsView: DragView, context: Context) {}
+    public func updateNSView(_ nsView: DragHandleView, context: Context) {}
 
-    public final class DragView: NSView {
-        private var initialMouseLocation: NSPoint = .zero
-        private var initialWindowOrigin: NSPoint = .zero
-
+    public final class DragHandleView: NSView {
         public override func resetCursorRects() {
             addCursorRect(bounds, cursor: .openHand)
         }
 
         public override func mouseDown(with event: NSEvent) {
-            initialMouseLocation = NSEvent.mouseLocation
-            if let window = self.window {
-                initialWindowOrigin = window.frame.origin
-                if let panel = window as? FloatingPanel {
-                    panel.hasUserMovedWindow = true
-                }
+            logTrace("DragHandleView: mouseDown at \(event.locationInWindow), initiating performDrag")
+            if let panel = window as? FloatingPanel {
+                panel.hasUserMovedWindow = true
             }
-        }
-
-        public override func mouseDragged(with event: NSEvent) {
-            guard let window = self.window else { return }
-            let current = NSEvent.mouseLocation
-            let dx = current.x - initialMouseLocation.x
-            let dy = current.y - initialMouseLocation.y
-            window.setFrameOrigin(NSPoint(
-                x: initialWindowOrigin.x + dx,
-                y: initialWindowOrigin.y + dy
-            ))
+            window?.performDrag(with: event)
         }
     }
 }
+
+public typealias WindowDragArea = WindowDragHandle
 
 // MARK: - Frosted Liquid Glass Background
 struct VisualEffectBackground: NSViewRepresentable {
