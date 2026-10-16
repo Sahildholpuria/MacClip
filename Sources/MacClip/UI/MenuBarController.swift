@@ -36,6 +36,17 @@ public final class MenuBarController {
 
     public func showMenu() {
         let menu = NSMenu()
+
+        // App & Developer Info
+        let headerItem = NSMenuItem(
+            title: "MacClip v\(AppMetadata.version) • Developer: \(AppMetadata.developerName)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        headerItem.isEnabled = false
+        menu.addItem(headerItem)
+        menu.addItem(NSMenuItem.separator())
+
         let hotkey = GlobalHotKeyManager.shared.currentSetting
 
         let openItem = NSMenuItem(

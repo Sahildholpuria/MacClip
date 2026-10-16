@@ -206,9 +206,15 @@ public struct ClipboardHistoryView: View {
 
                 Spacer()
 
-                Text("Preferences")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(.primary)
+                VStack(spacing: 1.5) {
+                    Text("Preferences")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(.primary)
+
+                    Text("MacClip v\(AppMetadata.version) • \(AppMetadata.developerName)")
+                        .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
 
                 Spacer()
 
@@ -1009,6 +1015,9 @@ public struct ClipboardHistoryView: View {
                         .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
                 )
 
+                // About MacClip & Developer Card (Liquid Glass)
+                aboutDeveloperCard
+
                 // Done Button
                 HStack {
                     Spacer()
@@ -1036,6 +1045,75 @@ public struct ClipboardHistoryView: View {
             .padding(14)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    // MARK: - About & Developer Card (Liquid Glass)
+    private var aboutDeveloperCard: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.accentColor, Color.indigo],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 38, height: 38)
+                    .shadow(color: Color.accentColor.opacity(0.35), radius: 6, y: 2)
+
+                Image(systemName: "paperclip")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(AppMetadata.appName)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+
+                    Text("v\(AppMetadata.version)")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(.accentColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1.5)
+                        .background(Color.accentColor.opacity(0.12))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.accentColor.opacity(0.25), lineWidth: 0.6))
+                }
+
+                HStack(spacing: 4) {
+                    Text("Developer:")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundColor(.secondary)
+
+                    Text(AppMetadata.developerName)
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .foregroundColor(.primary.opacity(0.95))
+                }
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("Native macOS")
+                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+                Text("Liquid Glass UI")
+                    .font(.system(size: 9, weight: .regular))
+                    .foregroundColor(.secondary.opacity(0.75))
+            }
+        }
+        .padding(11)
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+        )
     }
 
     // MARK: - List
@@ -1100,6 +1178,11 @@ public struct ClipboardHistoryView: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 36)
+
+                Text("MacClip v\(AppMetadata.version) • Developer: \(AppMetadata.developerName)")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary.opacity(0.65))
+                    .padding(.top, 4)
             } else {
                 Text("No Matching Clips")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -1589,66 +1672,94 @@ public struct ClipboardHistoryView: View {
     // MARK: - Footer
     private var footerView: some View {
         HStack {
-            // Count indicators
-            // Left Group: Count indicators & Clear Unpinned
-            HStack(spacing: 6) {
-                HStack(spacing: 4) {
-                    Image(systemName: "square.stack.3d.up.fill")
-                        .font(.system(size: 9))
-                    Text("\(store.items.count)")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+            if store.isSettingsOpen {
+                // Developer & Version footer for Preferences
+                HStack(spacing: 5) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.accentColor)
+                    Text("Developer: \(AppMetadata.developerName)")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
                 }
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Text(AppMetadata.appName)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary.opacity(0.85))
+                    Text("v\(AppMetadata.version)")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(.accentColor)
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2.5)
                 .background(Color.white.opacity(0.05))
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.6))
-
-                let pinnedCount = store.items.filter { $0.isPinned }.count
-                if pinnedCount > 0 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "pin.fill")
-                            .font(.system(size: 8))
-                        Text("\(pinnedCount)")
+                .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.6))
+            } else {
+                // Count indicators & Clear Unpinned
+                HStack(spacing: 6) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.stack.3d.up.fill")
+                            .font(.system(size: 9))
+                        Text("\(store.items.count)")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                     }
-                    .foregroundColor(.orange)
+                    .foregroundColor(.secondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(Color.orange.opacity(0.12))
+                    .background(Color.white.opacity(0.05))
                     .clipShape(Capsule())
-                    .overlay(Capsule().stroke(Color.orange.opacity(0.25), lineWidth: 0.6))
-                }
+                    .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.6))
+                    .help("MacClip v\(AppMetadata.version) • Developed by \(AppMetadata.developerName)")
 
-                if !store.items.isEmpty && !store.isSettingsOpen {
-                    Button(action: {
-                        withAnimation {
-                            store.clearUnpinned()
+                    let pinnedCount = store.items.filter { $0.isPinned }.count
+                    if pinnedCount > 0 {
+                        HStack(spacing: 3) {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 8))
+                            Text("\(pinnedCount)")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
                         }
-                    }) {
-                        Text("Clear Unpinned")
-                            .font(.system(size: 9.5, weight: .medium, design: .rounded))
-                            .foregroundColor(.secondary.opacity(0.85))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(Color.white.opacity(0.04))
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.6))
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.orange.opacity(0.12))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.orange.opacity(0.25), lineWidth: 0.6))
                     }
-                    .buttonStyle(.plain)
-                    .help("Clear all unpinned clips")
+
+                    if !store.items.isEmpty && !store.isSettingsOpen {
+                        Button(action: {
+                            withAnimation {
+                                store.clearUnpinned()
+                            }
+                        }) {
+                            Text("Clear Unpinned")
+                                .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                                .foregroundColor(.secondary.opacity(0.85))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.white.opacity(0.04))
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.6))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Clear all unpinned clips")
+                    }
                 }
-            }
 
-            Spacer(minLength: 10)
+                Spacer(minLength: 10)
 
-            // Right Group: Keyboard shortcut hints (guaranteed non-wrapping)
-            HStack(spacing: 4.5) {
-                footerKeycapHint(key: "↵", label: "Paste")
-                footerKeycapHint(key: "⇧↵", label: "Plain")
-                footerKeycapHint(key: "Space", label: "Preview")
-                footerKeycapHint(key: "⌘⌫", label: "Del")
+                // Right Group: Keyboard shortcut hints (guaranteed non-wrapping)
+                HStack(spacing: 4.5) {
+                    footerKeycapHint(key: "↵", label: "Paste")
+                    footerKeycapHint(key: "⇧↵", label: "Plain")
+                    footerKeycapHint(key: "Space", label: "Preview")
+                    footerKeycapHint(key: "⌘⌫", label: "Del")
+                }
             }
         }
     }

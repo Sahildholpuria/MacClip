@@ -1,6 +1,18 @@
 import AppKit
 import SwiftUI
 
+// MARK: - Application Metadata
+public enum AppMetadata {
+    public static let appName = "MacClip"
+    public static let developerName = "Sahil Dholpuria"
+    public static var version: String {
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0"
+    }
+    public static var buildNumber: String {
+        return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "7"
+    }
+}
+
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     public static private(set) var shared: AppDelegate?
 
